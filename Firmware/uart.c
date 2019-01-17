@@ -50,10 +50,8 @@ void uart_init(void)
   P1SEL  = RXD + TXD;                       
   P1SEL2 = RXD + TXD;                       
   UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-  UCA0BR0 = 69;                            // 8MHz 115200
-  UCA0BR1 = 0x0;                              // 8MHz 115200
-  //UCA0BR0 = 0x40;                            // 8MHz 9600
-  //UCA0BR1 = 0x03;                              // 8MHz 9600
+  UCA0BR0 = 0x40;                            // 8MHz 9600
+  UCA0BR1 = 0x03;                              // 8MHz 9600
   UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
   UCA0CTL1 &= ~UCSWRST;                     // Initialize USCI state machine
   //IE2 |= UCA0RXIE;                          // Enable USCI_A0 RX interrupt

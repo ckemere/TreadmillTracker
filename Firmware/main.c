@@ -39,18 +39,22 @@
 #include "uart.h"
 
 // Quadrature encoders
-#define c_EncoderPinA 0 // Pin 2.0
-#define c_EncoderPinB 1 // Pin 2.1
-#define c_EncoderPinZ 2 // Pin 2.2
+#define c_EncoderPinA 4 // Pin 2.4
+#define c_EncoderPinB 3 // Pin 2.3
+#define c_EncoderPinZ 5 // Pin 2.5
 
-//#define BitA (0x01 << c_EncoderPinA)
-//#define BitB (0x01 << c_EncoderPinB)
-//#define BitZ (0x01 << c_EncoderPinZ)
+#define BitA (char) 0x10
+#define BitB (char) 0x08
+#define BitZ (char) 0x20
 
-#define BitA (char) 0x01
-#define BitB (char) 0x02
-#define BitZ (char) 0x04
+#define EncPIN P2IN
+#define EncPIE P2IE
+#define EncPIFG P2IFG
 
+#define LED_POUT P2OUT
+#define LED_PDIR P2DIR
+#define PWR_LED 0x01 // Pin 2.0
+#define STATUS_LED 0x02 // Pin 2.1
 
 volatile int IndexTicks = 0;
 volatile long int EncoderTicks = 0;
@@ -93,17 +97,16 @@ int main(void)
     // Set up system clocks
     BCSCTL1 = CALBC1_8MHZ;   // Set range
     DCOCTL = CALDCO_8MHZ;    // Set DCO step + modulation
-    //BCSCTL2 = DIVS_3;  // Setup SMCLK to be 1 MHz (divide DCO/8)
 
-    TA1CTL = TASSEL_2 + MC_1;  // SMCLK (1 MHz), up mode, enable interrupt
+    TA1CTL = TASSEL_2 + MC_1;  // SMCLK (8 MHz), up mode, enable interrupt
     TA1CCR0 = 8000;            // 1 ms period
     TA1CCTL0 = CCIE;           // CCR0 interrupt enabled
  
-    P1DIR  = BIT0 + BIT6;     // P1.0 and P1.6 are the red+green LEDs 
-    P1OUT  = BIT0 + BIT6;     // All LEDs off
+    LED_PDIR  = STATUS_LED + PWR_LED;     // P1.0 and P1.6 are the red+green LEDs 
+    LED_POUT  = STATUS_LED + PWR_LED;     // All LEDs off
 
-    P2IE = BitA;
-    P2IFG = 0;
+    EncPIE = BitA;
+    EncPIFG = 0;
   
     uart_init();
 
@@ -112,7 +115,7 @@ int main(void)
     uart_puts((char *)"MSP430 Quadrature!\n\r");
 
     while(1) {
-     P1OUT ^= BIT6;       // Toggle P1.6 output (green LED) using exclusive-OR
+     LED_POUT ^= STATUS_LED;       // Toggle P1.6 output (green LED) using exclusive-OR
      __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
      uart_putc('E');
      print_num(EncoderTicks);
@@ -128,50 +131,50 @@ int main(void)
 __interrupt void Port2_ISR(void) 
 {
   static int ZInterlock = 4;
-    if ((P2IE & BitA) > 0) {
-    if (!(P2IN && BitB)) {
+    if ((EncPIE & BitA) > 0) {
+    if (!(EncPIN && BitB)) {
       EncoderTicks += 1; 
     }
     else {
       EncoderTicks -= 1;
     }
-    P2IFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
-    P2IE &= ~BitA;  // Turn off A
-    P2IE |= BitB;  // Turn on B
-    if ((P2IN & BitZ) == 0) {
+    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
+    EncPIE &= ~BitA;  // Turn off A
+    EncPIE |= BitB;  // Turn on B
+    if ((EncPIN & BitZ) == 0) {
       ZInterlock--;
       if (ZInterlock == 0){
-        P2IE |= BitZ;
+        EncPIE |= BitZ;
         ZInterlock = 4;
       }
     }
   }
-  else if ((P2IE & BitB) > 0)  {
-    if (P2IN && BitA) {
+  else if ((EncPIE & BitB) > 0)  {
+    if (EncPIN && BitA) {
       EncoderTicks += 1; 
     }
     else {
       EncoderTicks -= 1;
     }
-    P2IFG &= ~(BitB + BitA); // Clear B Flag (why do I have to clear A here???)
-    P2IE &= ~BitB; // Turn off B
-    P2IE = BitA; // Turn on A
-    if ((P2IN & BitZ) == 0) {
+    EncPIFG &= ~(BitB + BitA); // Clear B Flag (why do I have to clear A here???)
+    EncPIE &= ~BitB; // Turn off B
+    EncPIE = BitA; // Turn on A
+    if ((EncPIN & BitZ) == 0) {
       ZInterlock--;
       if (ZInterlock == 0){
-        P2IE |= BitZ;
+        EncPIE |= BitZ;
         ZInterlock = 4;
       }
     }
   }
   
-  if ((P2IE & BitZ) > 0) { // Index!
-    if ((P2IFG & BitZ) > 0) {
+  if ((EncPIE & BitZ) > 0) { // Index!
+    if ((EncPIFG & BitZ) > 0) {
       IndexTicks++;
       FullCycleTicks = EncoderTicks;
       EncoderTicks = 0;
-      P2IFG &= ~(BitZ);
-      P2IE &= ~(BitZ); // Disable for a while
+      EncPIFG &= ~(BitZ);
+      EncPIE &= ~(BitZ); // Disable for a while
     }
   }
 }  
@@ -183,7 +186,7 @@ __interrupt void MasterClockISR (void)
     static unsigned int SecondCounter = 1000; // should be 1000!
 
     if (--SecondCounter == 0) {
-        SecondCounter = 10;
+        SecondCounter = 1000;
         __bic_SR_register_on_exit(CPUOFF);
     }
 }
