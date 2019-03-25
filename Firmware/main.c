@@ -35,17 +35,18 @@
  ******************************************************************************/
 
 #include <msp430.h>
+#include <stdint.h>
 
 #include "uart.h"
 
 // Quadrature encoders
 #define c_EncoderPinA 4 // Pin 2.4
 #define c_EncoderPinB 3 // Pin 2.3
-#define c_EncoderPinZ 5 // Pin 2.5
+#define c_EncoderPinZ 6 // Pin 2.5
 
 #define BitA (char) 0x10
 #define BitB (char) 0x08
-#define BitZ (char) 0x20
+#define BitZ (char) 0x40 // 0x20
 
 #define EncPIN P2IN
 #define EncPIE P2IE
@@ -53,38 +54,43 @@
 
 #define LED_POUT P2OUT
 #define LED_PDIR P2DIR
-#define PWR_LED 0x01 // Pin 2.0
+#define PWR_LED 0x20 // Pin 2.0
 #define STATUS_LED 0x02 // Pin 2.1
 
 volatile int IndexTicks = 0;
-volatile long int EncoderTicks = 0;
+//volatile long int EncoderTicks = 0;
+volatile int32_t EncoderTicks = 0;
+volatile uint16_t MasterClockHigh = 0;
 volatile int LastFullCycle = -1;
 volatile int FullCycleTicks = 0;
 volatile int DoubleInterrupt = 0;
 
 
-void print_num(long int Temp) {
-     char *iptr;
-     char anum[8];
-  
-     if (Temp < 0) {
-      uart_putc('-');
-      Temp = -Temp;
-     }
-     
-     iptr = (char*) &Temp;
-     
-     anum[7] = (*iptr & 0xF);
-     anum[6] = ((*iptr++ & 0xF0) >> 4);
-     anum[5] = (*iptr & 0xF);
-     anum[4] = ((*iptr++ & 0xF0) >> 4);
-     anum[3] = (*iptr & 0xF);
-     anum[2] = ((*iptr++ & 0xF0) >> 4);
-     anum[1] = (*iptr & 0xF);
-     anum[0] = ((*iptr++ & 0xF0) >> 4);
-     
-     uart_putsn(anum,8);
+volatile unsigned int SecondCounter = 1000; // should be 1000!
+
+char *cEncoderTicksPtr;
+char *cMasterClockPtr;
+
+void SendData()
+{
+    uart_putc('E');
+
+    // Send timestamp (remember that we're little endian)
+    uart_putc(*(cMasterClockPtr+1));
+    uart_putc(*cMasterClockPtr);
+    uart_putc(*((char *)TA1R + 1));
+    uart_putc(*((char *)TA1R));
+
+    // Send wheel data
+    uart_putc(*cEncoderTicksPtr);
+    uart_putc(*(cEncoderTicksPtr+1));
+    uart_putc(*(cEncoderTicksPtr+2));
+    uart_putc(*(cEncoderTicksPtr+3));
+
+    uart_putc('\n');
+    return;
 }
+
 
 /**
  * Main routine
@@ -98,30 +104,32 @@ int main(void)
     BCSCTL1 = CALBC1_8MHZ;   // Set range
     DCOCTL = CALDCO_8MHZ;    // Set DCO step + modulation
 
-    TA1CTL = TASSEL_2 + MC_1;  // SMCLK (8 MHz), up mode, enable interrupt
-    TA1CCR0 = 8000;            // 1 ms period
+    TA1CTL = TASSEL_2 + MC_2 + ID_3;  // SMCLK (8 MHz), continuous mode, enable interrupt, divide by 8
+    TA1CCR0 = 0;            // interrupt on overflow
     TA1CCTL0 = CCIE;           // CCR0 interrupt enabled
+
+    TA0CTL = TASSEL_2 + MC_1 + ID_3;  // SMCLK (8 MHz), up mode, enable interrupt, divide by 8
+    TA0CCR0 = 999;            // 1 ms period
+    TA0CCTL0 = CCIE;           // CCR0 interrupt enabled
+
  
     LED_PDIR  = STATUS_LED + PWR_LED;     // P1.0 and P1.6 are the red+green LEDs 
     LED_POUT  = STATUS_LED + PWR_LED;     // All LEDs off
 
     EncPIE = BitA;
     EncPIFG = 0;
+
+    cEncoderTicksPtr = (char *)&EncoderTicks;
+    cMasterClockPtr = (char *)&MasterClockHigh;
   
     uart_init();
 
     __bis_SR_register(GIE);
 
-    uart_puts((char *)"MSP430 Quadrature!\n\r");
-
     while(1) {
      LED_POUT ^= STATUS_LED;       // Toggle P1.6 output (green LED) using exclusive-OR
      __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
-     uart_putc('E');
-     print_num(EncoderTicks);
-     //uart_putc(' ');
-     //print_num(FullCycleTicks);
-     uart_putc('\n');
+     SendData();
     } 
 }
 
@@ -183,7 +191,14 @@ __interrupt void Port2_ISR(void)
 #pragma vector=TIMER1_A0_VECTOR
 __interrupt void MasterClockISR (void)
 {
-    static unsigned int SecondCounter = 1000; // should be 1000!
+  MasterClockHigh++; 
+}
+
+
+// Timer A0 interrupt service routine => Assume CCR0 set for 1 ms ticks
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void WakeupTimerISR (void)
+{
 
     if (--SecondCounter == 0) {
         SecondCounter = 1000;

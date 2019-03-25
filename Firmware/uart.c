@@ -68,29 +68,3 @@ void uart_putc(unsigned char c)
   while (!(IFG2&UCA0TXIFG));              // USCI_A0 TX buffer ready?
     UCA0TXBUF = c;                        // TX
 }
-
-
-void uart_putcn(unsigned char c)
-{
-  if (c < 10) {
-    c = c + 0x30;
-  }
-  else {
-    c = c + 0x37;
-  }
-  while (!(IFG2&UCA0TXIFG));              // USCI_A0 TX buffer ready?
-    UCA0TXBUF = c;                        // TX
-}
-
-void uart_puts(const char *str)
-{
-     while(*str) uart_putc(*str++);
-}
-
-
-void uart_putsn(const char *str, int n)
-{
-  int i;
-  for (i = 0; i < n; i++)
-    uart_putcn(*str++);
-}

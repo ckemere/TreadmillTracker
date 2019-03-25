@@ -47,16 +47,7 @@ unsigned char uart_getc();
  * @param[in] *c  the character to write
  */
 void uart_putc(unsigned char c);
-void uart_putcn(unsigned char c);
 
-
-/**
- * Write string to the UART blocking.
- *
- * @param[in] *str  the 0 terminated string to write
- */
-void uart_puts(const char *str);
-void uart_putsn(const char *str, int n);
 
 
 #endif
