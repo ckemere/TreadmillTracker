@@ -46,7 +46,7 @@
 
 #define BitA (char) 0x10
 #define BitB (char) 0x08
-#define BitZ (char) 0x40 // 0x20
+#define BitZ (char) 0x20
 
 #define EncPIN P2IN
 #define EncPIE P2IE
@@ -78,8 +78,8 @@ void SendData()
     // Send timestamp (remember that we're little endian)
     uart_putc(*(cMasterClockPtr+1));
     uart_putc(*cMasterClockPtr);
-    uart_putc(*((char *)TA1R + 1));
-    uart_putc(*((char *)TA1R));
+    uart_putc(*((char *)TA0R + 1));
+    uart_putc(*((char *)TA0R));
 
     // Send wheel data
     uart_putc(*cEncoderTicksPtr);
@@ -101,20 +101,23 @@ int main(void)
     WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
 
     // Set up system clocks
+    // Drive master clock at 8MHz
     BCSCTL1 = CALBC1_8MHZ;   // Set range
     DCOCTL = CALDCO_8MHZ;    // Set DCO step + modulation
+    
 
-    TA1CTL = TASSEL_2 + MC_2 + ID_3;  // SMCLK (8 MHz), continuous mode, enable interrupt, divide by 8
-    TA1CCR0 = 0;            // interrupt on overflow
-    TA1CCTL0 = CCIE;           // CCR0 interrupt enabled
-
-    TA0CTL = TASSEL_2 + MC_1 + ID_3;  // SMCLK (8 MHz), up mode, enable interrupt, divide by 8
-    TA0CCR0 = 999;            // 1 ms period
+    P1SEL = 0x01;
+    TA0CTL = TASSEL_0 + MC_2 + ID_1;  // From Input (8 MHz), up mode
+    TA0CCR0 = 10;            // interrupt on overflow
     TA0CCTL0 = CCIE;           // CCR0 interrupt enabled
 
+    TA1CTL = TASSEL_2 + MC_1 + ID_3;  // SMCLK (8 MHz), up mode, enable interrupt
+    TA1CCR0 = 1000;            // 1 s period
+    TA1CCTL0 = CCIE;           // CCR0 interrupt enabled
+
  
-    LED_PDIR  = STATUS_LED + PWR_LED;     // P1.0 and P1.6 are the red+green LEDs 
-    LED_POUT  = STATUS_LED + PWR_LED;     // All LEDs off
+    LED_PDIR  |= STATUS_LED + PWR_LED;     
+    LED_POUT  |= STATUS_LED + PWR_LED;     // All LEDs on
 
     EncPIE = BitA;
     EncPIFG = 0;
@@ -127,7 +130,7 @@ int main(void)
     __bis_SR_register(GIE);
 
     while(1) {
-     LED_POUT ^= STATUS_LED;       // Toggle P1.6 output (green LED) using exclusive-OR
+     LED_POUT ^= STATUS_LED;       // Toggle LED using exclusive-OR
      __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
      SendData();
     } 
@@ -187,16 +190,17 @@ __interrupt void Port2_ISR(void)
   }
 }  
 
-// Timer A1 interrupt service routine => Assume CCR0 set for 1 ms ticks
-#pragma vector=TIMER1_A0_VECTOR
+// Timer A0 interrupt service routine => Assume CCR0 set for 1 ms ticks
+#pragma vector=TIMER0_A0_VECTOR
 __interrupt void MasterClockISR (void)
 {
   MasterClockHigh++; 
+  TA0CCR0 += 10;
 }
 
 
-// Timer A0 interrupt service routine => Assume CCR0 set for 1 ms ticks
-#pragma vector=TIMER0_A0_VECTOR
+// Timer A1 interrupt service routine => Assume CCR0 set for 1 ms ticks
+#pragma vector=TIMER1_A0_VECTOR
 __interrupt void WakeupTimerISR (void)
 {
 
@@ -204,4 +208,5 @@ __interrupt void WakeupTimerISR (void)
         SecondCounter = 1000;
         __bic_SR_register_on_exit(CPUOFF);
     }
+
 }
