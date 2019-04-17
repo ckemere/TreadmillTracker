@@ -44,18 +44,18 @@
 #define c_EncoderPinB 3 // Pin 2.3
 #define c_EncoderPinZ 6 // Pin 2.5
 
-#define BitA (char) 0x10
-#define BitB (char) 0x08
-#define BitZ (char) 0x20
+#define BitA (char) 0x02
+#define BitB (char) 0x01
+#define BitZ (char) 0x04
 
 #define EncPIN P2IN
 #define EncPIE P2IE
 #define EncPIFG P2IFG
 
-#define LED_POUT P2OUT
-#define LED_PDIR P2DIR
+#define LED_POUT P1OUT
+#define LED_PDIR P1DIR
 #define PWR_LED 0x20 // Pin 2.0
-#define STATUS_LED 0x02 // Pin 2.1
+#define STATUS_LED 0x10 // Pin 2.1
 
 volatile int IndexTicks = 0;
 //volatile long int EncoderTicks = 0;
@@ -105,25 +105,24 @@ int main(void)
     BCSCTL1 = CALBC1_8MHZ;   // Set range
     DCOCTL = CALDCO_8MHZ;    // Set DCO step + modulation
     
-
+    P1DIR = 0x00;
     P1SEL = 0x01;
-    TA0CTL = TASSEL_0 + MC_2 + ID_1;  // From Input (8 MHz), up mode
-    TA0CCR0 = 10;            // interrupt on overflow
+    P1SEL2 = 0x00;
+    TA0CTL = TASSEL_0 + MC_2 + ID_1 + TAIE + TACLR;  // TA0CLK Input (2KHz), 
+      // continuous mode, divide by 2 (1 kHz), enable timer overflow interrupt, reset counter
+    TA0CCR0 = 100;            // interrupt on overflow
     TA0CCTL0 = CCIE;           // CCR0 interrupt enabled
-
-    TA1CTL = TASSEL_2 + MC_1 + ID_3;  // SMCLK (8 MHz), up mode, enable interrupt
-    TA1CCR0 = 1000;            // 1 s period
-    TA1CCTL0 = CCIE;           // CCR0 interrupt enabled
-
  
-    LED_PDIR  |= STATUS_LED + PWR_LED;     
-    LED_POUT  |= STATUS_LED + PWR_LED;     // All LEDs on
+    LED_PDIR |= STATUS_LED + PWR_LED;     
+    LED_POUT |= STATUS_LED + PWR_LED;     // All LEDs on
 
-    EncPIE = BitA;
+    EncPIE |= BitA;
     EncPIFG = 0;
 
     cEncoderTicksPtr = (char *)&EncoderTicks;
     cMasterClockPtr = (char *)&MasterClockHigh;
+
+    __delay_cycles(1000000);
   
     uart_init();
 
@@ -190,23 +189,23 @@ __interrupt void Port2_ISR(void)
   }
 }  
 
-// Timer A0 interrupt service routine => Assume CCR0 set for 1 ms ticks
+// Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
+//   Assumes TimerA0 is set up for 1 ms, continuous mode.
 #pragma vector=TIMER0_A0_VECTOR
-__interrupt void MasterClockISR (void)
+__interrupt void WakeupClockISR (void)
 {
-  MasterClockHigh++; 
-  TA0CCR0 += 10;
+  TA0CCR0 += 100;
+  __bic_SR_register_on_exit(CPUOFF);
 }
 
 
-// Timer A1 interrupt service routine => Assume CCR0 set for 1 ms ticks
-#pragma vector=TIMER1_A0_VECTOR
-__interrupt void WakeupTimerISR (void)
+// Timer A0 overflow interrupt service routine => increment higher 16bit counter
+//   Assumes TimerA0 is set up for 1 ms, continuous mode.
+#pragma vector=TIMER0_A1_VECTOR
+__interrupt void MasterClockISR (void)
 {
-
-    if (--SecondCounter == 0) {
-        SecondCounter = 1000;
-        __bic_SR_register_on_exit(CPUOFF);
-    }
-
+  if (TA0IV | TAIFG) {
+    MasterClockHigh++;
+  }
+ 
 }

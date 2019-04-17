@@ -33,12 +33,12 @@
 /**
  * Receive Data (RXD) at P1.1
  */
-#define RXD    BIT1
+#define RXD BIT1
 
 /**
  * Transmit Data (TXD) at P1.2
  */
-#define TXD   BIT2
+#define TXD BIT2
 
 /**
  * Callback handler for receive
@@ -47,8 +47,8 @@ void (*uart_rx_isr_ptr)(unsigned char c);
 
 void uart_init(void)
 {
-  P1SEL  = RXD + TXD;                       
-  P1SEL2 = RXD + TXD;                       
+  P1SEL  |= RXD + TXD;                       
+  P1SEL2 |= RXD + TXD;                       
   UCA0CTL1 |= UCSSEL_2;                     // SMCLK
   UCA0BR0 = 0x40;                            // 8MHz 9600
   UCA0BR1 = 0x03;                              // 8MHz 9600
