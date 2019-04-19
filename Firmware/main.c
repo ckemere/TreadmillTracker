@@ -191,21 +191,39 @@ __interrupt void Port2_ISR(void)
 
 // Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-#pragma vector=TIMER0_A0_VECTOR
-__interrupt void WakeupClockISR (void)
+//#pragma vector=TIMER0_A0_VECTOR
+//__interrupt void WakeupClockISR (void)
+__attribute__((interrupt(TIMER0_A0_VECTOR)))
+void WakeupClockISR()
 {
-  TA0CCR0 += 100;
-  __bic_SR_register_on_exit(CPUOFF);
+  //TA0CCR0 += 100;
+  //__bic_SR_register_on_exit(CPUOFF);
+  
+  // Using assembly saves a push and pop
+  __asm__("add #100, %[TIMERREG]\n"
+          "bic #16,  0(R1)\n" // bic_SR_on_exit(CPUOFF) //"reti\n"
+  :[TIMERREG] "=m" (TA0CCR0) );
 }
 
 
 // Timer A0 overflow interrupt service routine => increment higher 16bit counter
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-#pragma vector=TIMER0_A1_VECTOR
-__interrupt void MasterClockISR (void)
+//#pragma vector=TIMER0_A1_VECTOR
+//__interrupt void MasterClockISR (void)
+__attribute__((interrupt(TIMER0_A1_VECTOR)))
+void MasterClockISR()
 {
-  if (TA0IV | TAIFG) {
-    MasterClockHigh++;
-  }
- 
+  //if (TA0IV & TAIFG)
+  //  MasterClockHigh++;
+
+  // Use ISR table construction from Users Guide
+  __asm__("add %[Offset], r0\n"
+          "RETI\n" // Vector 0: No Interrupt
+          "RETI\n" // Vector 2: TACCR1; would be a JMP if used
+          "RETI\n" // Vector 4: TACCR1; would be a JMP if used
+          "RETI\n" // Vector 4: Reserved
+          "RETI\n" // Vector 8: Reserved
+          "inc %[MasterClockHigh]\n"
+  : [MasterClockHigh] "=m" (MasterClockHigh) : [Offset] "m" (TA0IV) );
+  // RETI is automatically added at end 
 }
