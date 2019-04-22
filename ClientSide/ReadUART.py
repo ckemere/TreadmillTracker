@@ -7,7 +7,7 @@ import struct
 
 
 #%%
-ser = serial.Serial(port='/dev/ttyACM3',
+ser = serial.Serial(port='/dev/ttyACM4',
  baudrate = 9600,
  parity=serial.PARITY_NONE,
  stopbits=serial.STOPBITS_ONE,

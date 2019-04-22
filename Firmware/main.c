@@ -44,9 +44,9 @@
 #define c_EncoderPinB 3 // Pin 2.3
 #define c_EncoderPinZ 6 // Pin 2.5
 
-#define BitA (char) 0x02
-#define BitB (char) 0x01
-#define BitZ (char) 0x04
+#define BitA 0x02
+#define BitB 0x01
+#define BitZ 0x04
 
 #define EncPIN P2IN
 #define EncPIE P2IE
@@ -57,12 +57,12 @@
 #define PWR_LED 0x20 // Pin 2.0
 #define STATUS_LED 0x10 // Pin 2.1
 
-volatile int IndexTicks = 0;
+volatile uint16_t IndexTicks = 0;
 //volatile long int EncoderTicks = 0;
-volatile int32_t EncoderTicks = 0;
+volatile int16_t EncoderTicks = 0;
 volatile uint16_t MasterClockHigh = 0;
 volatile int LastFullCycle = -1;
-volatile int FullCycleTicks = 0;
+volatile int16_t FullCycleTicks = 0;
 volatile int DoubleInterrupt = 0;
 
 
@@ -84,8 +84,8 @@ void SendData()
     // Send wheel data
     uart_putc(*cEncoderTicksPtr);
     uart_putc(*(cEncoderTicksPtr+1));
-    uart_putc(*(cEncoderTicksPtr+2));
-    uart_putc(*(cEncoderTicksPtr+3));
+    //uart_putc(*(cEncoderTicksPtr+2));
+    //uart_putc(*(cEncoderTicksPtr+3));
 
     uart_putc('\n');
     return;
@@ -135,22 +135,71 @@ int main(void)
     } 
 }
 
-
+#define STRINGIFY2(x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
 
 #pragma vector=PORT2_VECTOR
-__interrupt void Port2_ISR(void) 
+__interrupt void QuadratureISR(void) 
 {
   static int ZInterlock = 4;
-    if ((EncPIE & BitA) > 0) {
+
+  __asm__(
+    "mov.b %[PxIE], r15\n"
+    "mov.b %[PxIN], r14\n"
+    "bit.b #" STRINGIFY(BitA) ", r15\n"
+    "jz CHECK_B\n"
+    "A_TRIGGERED:\n"
+    "bit.b #" STRINGIFY(BitB) ", r14\n"
+    "jnz DEC_COUNTER\n"
+    "jmp INC_COUNTER\n"
+    "CHECK_B:\n"
+    "bit.b #" STRINGIFY(BitB) ", r15\n"
+    "jz CHECK_Z:\n"
+    "B_TRIGGERED:\n"
+    "bit.b #" STRINGIFY(BitA) ", r14\n"
+    "jnz INC_COUNTER\n"
+    "DEC_COUNTER:\n"
+    "dec %[EncoderTicks]\n"
+    "jmp TOGGLE_CHANNEL\n"
+    "INC_COUNTER:\n"
+    "inc %[EncoderTicks]\n"
+    "TOGGLE_CHANNEL:\n"
+    "xor.b #" STRINGIFY(BitA+BitB) ", %[PxIE]\n"
+    "bic.b #" STRINGIFY(BitA+BitB) ", %[PxIFG]\n"
+    "bit.b #" STRINGIFY(BitZ) ", r14\n"
+    "jnz CHECK_Z\n"
+    "DECREMENT_Z_INTERLOCK:\n"
+    "dec %[ZInterlock]\n"
+    "jnz CHECK_Z\n"
+    "bis.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
+    "mov #4, %[ZInterlock]\n"
+    "CHECK_Z:\n"  
+    "bit.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
+    "jz CONCLUDE:\n"
+    "bit.b #" STRINGIFY(BitZ) ", %[PxIFG]\n"
+    "jz CONCLUDE:\n"
+    "inc %[IndexTicks]\n"
+    "mov %[EncoderTicks], %[FullCycleTicks]\n"
+    "mov #0, %[EncoderTicks]\n"
+    "bic.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
+    "bic.b #" STRINGIFY(BitZ) ", %[PxIFG]\n"
+    "CONCLUDE:\n"
+  : [PxIE] "=m" (EncPIE), [PxIFG] "=m" (EncPIFG), [EncoderTicks] "=m" (EncoderTicks), 
+    [ZInterlock] "=m" (ZInterlock), [IndexTicks] "=m" (IndexTicks), [FullCycleTicks] "=m" (FullCycleTicks)
+  : [PxIN] "m" (EncPIN) : "r14", "r15" );
+
+/*
+  if ((EncPIE & BitA) > 0) {
     if (!(EncPIN && BitB)) {
       EncoderTicks += 1; 
     }
     else {
       EncoderTicks -= 1;
     }
-    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
     EncPIE &= ~BitA;  // Turn off A
     EncPIE |= BitB;  // Turn on B
+    //EncPIE ^= BitA + BitB;
+    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
     if ((EncPIN & BitZ) == 0) {
       ZInterlock--;
       if (ZInterlock == 0){
@@ -166,9 +215,10 @@ __interrupt void Port2_ISR(void)
     else {
       EncoderTicks -= 1;
     }
-    EncPIFG &= ~(BitB + BitA); // Clear B Flag (why do I have to clear A here???)
     EncPIE &= ~BitB; // Turn off B
     EncPIE = BitA; // Turn on A
+    //EncPIE ^= BitA + BitB;
+    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
     if ((EncPIN & BitZ) == 0) {
       ZInterlock--;
       if (ZInterlock == 0){
@@ -177,7 +227,7 @@ __interrupt void Port2_ISR(void)
       }
     }
   }
-  
+
   if ((EncPIE & BitZ) > 0) { // Index!
     if ((EncPIFG & BitZ) > 0) {
       IndexTicks++;
@@ -187,6 +237,7 @@ __interrupt void Port2_ISR(void)
       EncPIE &= ~(BitZ); // Disable for a while
     }
   }
+*/
 }  
 
 // Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
@@ -218,11 +269,11 @@ void MasterClockISR()
 
   // Use ISR table construction from Users Guide
   __asm__("add %[Offset], r0\n"
-          "RETI\n" // Vector 0: No Interrupt
-          "RETI\n" // Vector 2: TACCR1; would be a JMP if used
-          "RETI\n" // Vector 4: TACCR1; would be a JMP if used
-          "RETI\n" // Vector 4: Reserved
-          "RETI\n" // Vector 8: Reserved
+          "reti\n" // Vector 0: No Interrupt
+          "reti\n" // Vector 2: TACCR1; would be a JMP if used
+          "reti\n" // Vector 4: TACCR1; would be a JMP if used
+          "reti\n" // Vector 4: Reserved
+          "reti\n" // Vector 8: Reserved
           "inc %[MasterClockHigh]\n"
   : [MasterClockHigh] "=m" (MasterClockHigh) : [Offset] "m" (TA0IV) );
   // RETI is automatically added at end 
