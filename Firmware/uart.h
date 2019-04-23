@@ -29,6 +29,8 @@
 #ifndef __UART_H
 #define __UART_H
 
+#include <stdint.h>
+
 /**
  * Initialize soft UART
  */
@@ -48,6 +50,6 @@ unsigned char uart_getc();
  */
 void uart_putc(unsigned char c);
 
-
+void uart_putw(unsigned int w);
 
 #endif

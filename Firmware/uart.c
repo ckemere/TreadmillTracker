@@ -26,7 +26,7 @@
  ******************************************************************************/
 
 #include <msp430.h>
-#include <legacymsp430.h>
+//#include <legacymsp430.h>
 
 #include "uart.h"
 
@@ -60,11 +60,33 @@ void uart_init(void)
 unsigned char uart_getc()
 {
     while (!(IFG2&UCA0RXIFG));                // USCI_A0 RX buffer ready?
-  return UCA0RXBUF;
+    return UCA0RXBUF;
 }
 
-void uart_putc(unsigned char c)
+inline void uart_putc(unsigned char c)
 {
-  while (!(IFG2&UCA0TXIFG));              // USCI_A0 TX buffer ready?
+    while (!(IFG2&UCA0TXIFG));              // USCI_A0 TX buffer ready?
     UCA0TXBUF = c;                        // TX
+}
+
+#define STRINGIFY2(x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
+
+//void uart_putw(uint16_t w)
+void uart_putw(unsigned int w)
+{
+  __asm__("swpb r15\n":::"r15"); // I know that w is in r15, want to transmit high byte first
+  //while (!(IFG2&UCA0TXIFG));             // USCI_A0 TX buffer ready?
+  __asm__("mov.b %[IFG2], r14\n"
+          "and  #" STRINGIFY(UCA0TXIFG) ", r14\n"
+          "jz $-6\n"::[IFG2] "m" (IFG2):"r14");
+  //UCA0TXBUF = w;                        // TX        
+  __asm__("mov.b r15, %[TXBUF]\n" : [TXBUF] "=m" (UCA0TXBUF));
+  
+  __asm__("swpb r15\n":::"r15"); // now we'll transmit low byte
+  //while (!(IFG2&UCA0TXIFG));             // USCI_A0 TX buffer ready?
+  __asm__("mov.b %[IFG2], r14\n"
+          "and  #" STRINGIFY(UCA0TXIFG) ", r14\n"
+          "jz $-6\n"::[IFG2] "m" (IFG2):"r14");
+  __asm__("mov.b r15, %[TXBUF]\n" : [TXBUF] "=m" (UCA0TXBUF));
 }

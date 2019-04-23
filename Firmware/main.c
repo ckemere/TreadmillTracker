@@ -34,58 +34,53 @@
  *       Launchpad.
  ******************************************************************************/
 
+#include "Quadrature.h"
+#include "uart.h"
+
 #include <msp430.h>
 #include <stdint.h>
 
-#include "uart.h"
-
-// Quadrature encoders
-#define c_EncoderPinA 4 // Pin 2.4
-#define c_EncoderPinB 3 // Pin 2.3
-#define c_EncoderPinZ 6 // Pin 2.5
-
-#define BitA 0x02
-#define BitB 0x01
-#define BitZ 0x04
-
-#define EncPIN P2IN
-#define EncPIE P2IE
-#define EncPIFG P2IFG
 
 #define LED_POUT P1OUT
 #define LED_PDIR P1DIR
 #define PWR_LED 0x20 // Pin 2.0
 #define STATUS_LED 0x10 // Pin 2.1
 
-volatile uint16_t IndexTicks = 0;
-//volatile long int EncoderTicks = 0;
-volatile int16_t EncoderTicks = 0;
 volatile uint16_t MasterClockHigh = 0;
-volatile int LastFullCycle = -1;
-volatile int16_t FullCycleTicks = 0;
-volatile int DoubleInterrupt = 0;
 
-
-volatile unsigned int SecondCounter = 1000; // should be 1000!
 
 char *cEncoderTicksPtr;
-char *cMasterClockPtr;
+char *cMasterClockHighPtr;
+char *cMasterClockLowPtr;
 
 void SendData()
 {
+    register uint16_t MasterClockHighCopy;
+    register uint16_t MasterClockLowCopy;
+    register int16_t  EncoderTicksCopy;
+
+    // NOTE: We're using POLLING for serial comms to make
+    //   sure that if there's a conflict between timing
+    //   or quadrature measurements and data x-mission,
+    //   timing/quadrature wins.
+
+    // Copy current clock and encoder data atomically.
+    __disable_interrupt();
+    MasterClockHighCopy = MasterClockHigh;
+    MasterClockLowCopy = TA0R;
+    EncoderTicksCopy = EncoderTicks;
+    __enable_interrupt();
+    
     uart_putc('E');
 
     // Send timestamp (remember that we're little endian)
-    uart_putc(*(cMasterClockPtr+1));
-    uart_putc(*cMasterClockPtr);
-    uart_putc(*((char *)TA0R + 1));
-    uart_putc(*((char *)TA0R));
+    uart_putw(MasterClockHighCopy); 
+    uart_putw(MasterClockLowCopy); 
+    //uart_putw(MasterClockHigh);
+    //uart_putw(TA0R);
 
     // Send wheel data
-    uart_putc(*cEncoderTicksPtr);
-    uart_putc(*(cEncoderTicksPtr+1));
-    //uart_putc(*(cEncoderTicksPtr+2));
-    //uart_putc(*(cEncoderTicksPtr+3));
+    uart_putw(EncoderTicksCopy);
 
     uart_putc('\n');
     return;
@@ -116,11 +111,11 @@ int main(void)
     LED_PDIR |= STATUS_LED + PWR_LED;     
     LED_POUT |= STATUS_LED + PWR_LED;     // All LEDs on
 
-    EncPIE |= BitA;
-    EncPIFG = 0;
+    quadrature_init();
 
-    cEncoderTicksPtr = (char *)&EncoderTicks;
-    cMasterClockPtr = (char *)&MasterClockHigh;
+    //cEncoderTicksPtr = (char *)&EncoderTicksCopy;
+    //cMasterClockHighPtr = (char *)&MasterClockHighCopy;
+    //cMasterClockLowPtr = (char *)&MasterClockLowCopy;
 
     __delay_cycles(1000000);
   
@@ -135,117 +130,11 @@ int main(void)
     } 
 }
 
-#define STRINGIFY2(x) #x
-#define STRINGIFY(x) STRINGIFY2(x)
-
-#pragma vector=PORT2_VECTOR
-__interrupt void QuadratureISR(void) 
-{
-  static int ZInterlock = 4;
-
-  __asm__(
-    "mov.b %[PxIE], r15\n"
-    "mov.b %[PxIN], r14\n"
-    "bit.b #" STRINGIFY(BitA) ", r15\n"
-    "jz CHECK_B\n"
-    "A_TRIGGERED:\n"
-    "bit.b #" STRINGIFY(BitB) ", r14\n"
-    "jnz DEC_COUNTER\n"
-    "jmp INC_COUNTER\n"
-    "CHECK_B:\n"
-    "bit.b #" STRINGIFY(BitB) ", r15\n"
-    "jz CHECK_Z:\n"
-    "B_TRIGGERED:\n"
-    "bit.b #" STRINGIFY(BitA) ", r14\n"
-    "jnz INC_COUNTER\n"
-    "DEC_COUNTER:\n"
-    "dec %[EncoderTicks]\n"
-    "jmp TOGGLE_CHANNEL\n"
-    "INC_COUNTER:\n"
-    "inc %[EncoderTicks]\n"
-    "TOGGLE_CHANNEL:\n"
-    "xor.b #" STRINGIFY(BitA+BitB) ", %[PxIE]\n"
-    "bic.b #" STRINGIFY(BitA+BitB) ", %[PxIFG]\n"
-    "bit.b #" STRINGIFY(BitZ) ", r14\n"
-    "jnz CHECK_Z\n"
-    "DECREMENT_Z_INTERLOCK:\n"
-    "dec %[ZInterlock]\n"
-    "jnz CHECK_Z\n"
-    "bis.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
-    "mov #4, %[ZInterlock]\n"
-    "CHECK_Z:\n"  
-    "bit.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
-    "jz CONCLUDE:\n"
-    "bit.b #" STRINGIFY(BitZ) ", %[PxIFG]\n"
-    "jz CONCLUDE:\n"
-    "inc %[IndexTicks]\n"
-    "mov %[EncoderTicks], %[FullCycleTicks]\n"
-    "mov #0, %[EncoderTicks]\n"
-    "bic.b #" STRINGIFY(BitZ) ", %[PxIE]\n"
-    "bic.b #" STRINGIFY(BitZ) ", %[PxIFG]\n"
-    "CONCLUDE:\n"
-  : [PxIE] "=m" (EncPIE), [PxIFG] "=m" (EncPIFG), [EncoderTicks] "=m" (EncoderTicks), 
-    [ZInterlock] "=m" (ZInterlock), [IndexTicks] "=m" (IndexTicks), [FullCycleTicks] "=m" (FullCycleTicks)
-  : [PxIN] "m" (EncPIN) : "r14", "r15" );
-
-/*
-  if ((EncPIE & BitA) > 0) {
-    if (!(EncPIN && BitB)) {
-      EncoderTicks += 1; 
-    }
-    else {
-      EncoderTicks -= 1;
-    }
-    EncPIE &= ~BitA;  // Turn off A
-    EncPIE |= BitB;  // Turn on B
-    //EncPIE ^= BitA + BitB;
-    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
-    if ((EncPIN & BitZ) == 0) {
-      ZInterlock--;
-      if (ZInterlock == 0){
-        EncPIE |= BitZ;
-        ZInterlock = 4;
-      }
-    }
-  }
-  else if ((EncPIE & BitB) > 0)  {
-    if (EncPIN && BitA) {
-      EncoderTicks += 1; 
-    }
-    else {
-      EncoderTicks -= 1;
-    }
-    EncPIE &= ~BitB; // Turn off B
-    EncPIE = BitA; // Turn on A
-    //EncPIE ^= BitA + BitB;
-    EncPIFG &= ~(BitA + BitB); // Clear A Flag (why do I have to clear B here???)
-    if ((EncPIN & BitZ) == 0) {
-      ZInterlock--;
-      if (ZInterlock == 0){
-        EncPIE |= BitZ;
-        ZInterlock = 4;
-      }
-    }
-  }
-
-  if ((EncPIE & BitZ) > 0) { // Index!
-    if ((EncPIFG & BitZ) > 0) {
-      IndexTicks++;
-      FullCycleTicks = EncoderTicks;
-      EncoderTicks = 0;
-      EncPIFG &= ~(BitZ);
-      EncPIE &= ~(BitZ); // Disable for a while
-    }
-  }
-*/
-}  
 
 // Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-//#pragma vector=TIMER0_A0_VECTOR
-//__interrupt void WakeupClockISR (void)
-__attribute__((interrupt(TIMER0_A0_VECTOR)))
-void WakeupClockISR()
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void WakeupClockISR (void)
 {
   //TA0CCR0 += 100;
   //__bic_SR_register_on_exit(CPUOFF);
@@ -259,10 +148,8 @@ void WakeupClockISR()
 
 // Timer A0 overflow interrupt service routine => increment higher 16bit counter
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-//#pragma vector=TIMER0_A1_VECTOR
-//__interrupt void MasterClockISR (void)
-__attribute__((interrupt(TIMER0_A1_VECTOR)))
-void MasterClockISR()
+#pragma vector=TIMER0_A1_VECTOR
+__interrupt void MasterClockISR (void)
 {
   //if (TA0IV & TAIFG)
   //  MasterClockHigh++;
