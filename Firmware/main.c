@@ -41,6 +41,7 @@
 #include <stdint.h>
 
 
+
 #define LED_POUT P1OUT
 #define LED_PDIR P1DIR
 #define PWR_LED 0x20 // Pin 2.0
@@ -58,6 +59,7 @@ void SendData()
     register uint16_t MasterClockHighCopy;
     register uint16_t MasterClockLowCopy;
     register int16_t  EncoderTicksCopy;
+    register unsigned char GPIO;
 
     // NOTE: We're using POLLING for serial comms to make
     //   sure that if there's a conflict between timing
@@ -69,18 +71,20 @@ void SendData()
     MasterClockHighCopy = MasterClockHigh;
     MasterClockLowCopy = TA0R;
     EncoderTicksCopy = EncoderTicks;
+    GPIO = P3IN;
     __enable_interrupt();
     
     uart_putc('E');
-
+ 
     // Send timestamp (remember that we're little endian)
     uart_putw(MasterClockHighCopy); 
     uart_putw(MasterClockLowCopy); 
-    //uart_putw(MasterClockHigh);
-    //uart_putw(TA0R);
 
     // Send wheel data
     uart_putw(EncoderTicksCopy);
+
+   // Send GPIO data
+    uart_putc(GPIO);
 
     uart_putc('\n');
     return;
@@ -112,21 +116,23 @@ int main(void)
     LED_POUT |= STATUS_LED + PWR_LED;     // All LEDs on
 
     quadrature_init();
-
-    //cEncoderTicksPtr = (char *)&EncoderTicksCopy;
-    //cMasterClockHighPtr = (char *)&MasterClockHighCopy;
-    //cMasterClockLowPtr = (char *)&MasterClockLowCopy;
-
-    __delay_cycles(1000000);
-  
     uart_init();
 
+    P3DIR = 0x0F;
+    P3REN = 0xF0;
+    P3OUT = 0x5F;
+    //P3OUT = 0x55; // set pull ups
+  
     __bis_SR_register(GIE);
 
     while(1) {
      LED_POUT ^= STATUS_LED;       // Toggle LED using exclusive-OR
-     __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
+     if (NewGPIOFlag) {
+       P3OUT = NewGPIO;
+       NewGPIOFlag = 0;
+     }
      SendData();
+     __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
     } 
 }
 

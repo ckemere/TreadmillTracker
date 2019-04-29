@@ -45,16 +45,22 @@
  */
 void (*uart_rx_isr_ptr)(unsigned char c);
 
+unsigned char NewGPIOFlag = 0;
+unsigned char NewGPIO = 0;
+
 void uart_init(void)
 {
   P1SEL  |= RXD + TXD;                       
   P1SEL2 |= RXD + TXD;                       
   UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-  UCA0BR0 = 0x40;                            // 8MHz 9600
-  UCA0BR1 = 0x03;                              // 8MHz 9600
-  UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
+  //UCA0BR0 = 0x40;                            // 8MHz 9600
+  //UCA0BR1 = 0x03;                              // 8MHz 9600
+  //UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
+  UCA0BR0 = 31;                            // 8MHz 256kHz
+  UCA0BR1 = 0x00;                              // 8MHz 256kHz
+  UCA0MCTL = UCBRS1;                        // Modulation UCBRSx = 2
   UCA0CTL1 &= ~UCSWRST;                     // Initialize USCI state machine
-  //IE2 |= UCA0RXIE;                          // Enable USCI_A0 RX interrupt
+  IE2 |= UCA0RXIE;                          // Enable USCI_A0 RX interrupt
 }
 
 unsigned char uart_getc()
@@ -89,4 +95,14 @@ void uart_putw(unsigned int w)
           "and  #" STRINGIFY(UCA0TXIFG) ", r14\n"
           "jz $-6\n"::[IFG2] "m" (IFG2):"r14");
   __asm__("mov.b r15, %[TXBUF]\n" : [TXBUF] "=m" (UCA0TXBUF));
+}
+
+
+// UART RX interrupt
+#pragma vector=USCIAB0RX_VECTOR
+__interrupt void USCI0RX_ISR(void)
+{
+  NewGPIO = UCA0RXBUF;                    // TX -> RXed character
+  NewGPIOFlag = 1;
+  __bic_SR_register_on_exit(CPUOFF);
 }

@@ -1,5 +1,5 @@
-#ifndef __UART_H
-#define __UART_H
+#ifndef __QUADRATURE_H
+#define __QUADRATURE_H
 
 #include <msp430.h>
 #include <stdint.h>
@@ -14,10 +14,6 @@
 #define BitA 0x02 // Pin 2.1
 #define BitB 0x01 // Pin 2.0
 #define BitZ 0x04 // Pin 2.2
-
-#define c_EncoderPinA 4 // Pin 2.4
-#define c_EncoderPinB 3 // Pin 2.3
-#define c_EncoderPinZ 6 // Pin 2.5
 
 extern volatile uint16_t IndexTicks;
 extern volatile int16_t EncoderTicks;

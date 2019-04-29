@@ -8,7 +8,8 @@ import struct
 
 #%%
 ser = serial.Serial(port='/dev/ttyUSB0',
- baudrate = 9600,
+ baudrate = 256000,
+ # baudrate = 9600,
  parity=serial.PARITY_NONE,
  stopbits=serial.STOPBITS_ONE,
  bytesize=serial.EIGHTBITS,
@@ -18,15 +19,14 @@ counter=0
 
 
 #%%
-print(struct.calcsize('<xHHix'))
-
-#%%
 lastMasterTime = 0;
 while(True):
-    x=ser.read(8)
-    if (len(x) == 8):
-        FlagChar, MasterTime, Encoder = struct.unpack('>cLhx', x)
-        print('Flag: {}. Clocks: {}. Encoder: {}'.format( 
-            FlagChar, MasterTime, Encoder))
+    x=ser.read(9)
+    if (len(x) == 9):
+        FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
+        # FlagChar, GPIO, MasterTime, Encoder  = struct.unpack('>cBLhx', x)
+        print('Flag: {}. Clocks: {}. Encoder: {}. GPIO: 0x{:08b}'.format( 
+            FlagChar, MasterTime, Encoder, GPIO))
         print('Elapsed: {}'.format(MasterTime - lastMasterTime))
         lastMasterTime = MasterTime;
+

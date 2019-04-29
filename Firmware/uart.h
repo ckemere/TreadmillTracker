@@ -31,6 +31,9 @@
 
 #include <stdint.h>
 
+extern unsigned char NewGPIO;
+extern unsigned char NewGPIOFlag;
+
 /**
  * Initialize soft UART
  */
