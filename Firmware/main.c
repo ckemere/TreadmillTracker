@@ -146,7 +146,7 @@ __interrupt void WakeupClockISR (void)
   //__bic_SR_register_on_exit(CPUOFF);
   
   // Using assembly saves a push and pop
-  __asm__("add #100, %[TIMERREG]\n"
+  __asm__("add #10, %[TIMERREG]\n"
           "bic #16,  0(R1)\n" // bic_SR_on_exit(CPUOFF) //"reti\n"
   :[TIMERREG] "=m" (TA0CCR0) );
 }

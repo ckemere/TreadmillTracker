@@ -45,17 +45,21 @@ x = ser.read(9-index) # read the last little bit of the bad block
 
 
 #%%
+print('Capturing data')
 lastMasterTime = 0;
 lastSystemTime = 0;
-while(True):
-    x=ser.read(9)
-    last_ts = time.time()
-    if (len(x) == 9):
-        FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
-        # FlagChar, GPIO, MasterTime, Encoder  = struct.unpack('>cBLhx', x)
-        print('Flag: {}. Clocks: {}. Encoder: {}. GPIO: 0x{:08b}'.format( 
-            FlagChar, MasterTime, Encoder, GPIO))
-        print('Elapsed: {} ({})'.format(MasterTime - lastMasterTime, last_ts - lastSystemTime))
-        lastMasterTime = MasterTime;
-        lastSystemTime = last_ts;
+FirstTSCaptured = False;
+
+with open('IntereventDataLatency.txt', 'w') as out_file:
+  while(True):
+      x=ser.read(9)
+      if (len(x) == 9):
+          last_ts = time.time()
+          FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
+          if FirstTSCaptured:
+            assert((MasterTime - lastMasterTime) == 10)
+            out_file.write('{}\n'.format(last_ts - lastSystemTime))
+          FirstTSCaptured = True;
+          lastMasterTime = MasterTime;
+          lastSystemTime = last_ts;
 
