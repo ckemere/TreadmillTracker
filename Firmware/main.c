@@ -40,8 +40,6 @@
 #include <msp430.h>
 #include <stdint.h>
 
-
-
 #define LED_POUT P1OUT
 #define LED_PDIR P1DIR
 #define PWR_LED 0x20 // Pin 2.0
@@ -146,7 +144,7 @@ __interrupt void WakeupClockISR (void)
   //__bic_SR_register_on_exit(CPUOFF);
   
   // Using assembly saves a push and pop
-  __asm__("add #10, %[TIMERREG]\n"
+  __asm__("add #2, %[TIMERREG]\n" // SERIAL TRANSMIT PERIOD in milliseconds
           "bic #16,  0(R1)\n" // bic_SR_on_exit(CPUOFF) //"reti\n"
   :[TIMERREG] "=m" (TA0CCR0) );
 }

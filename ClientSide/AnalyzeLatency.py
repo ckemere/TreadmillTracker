@@ -7,12 +7,8 @@ import seaborn as sns
 d = np.loadtxt('IntereventDataLatency.txt')
 
 
-
 #%%
-sns.distplot(d[d>0.001],100)
-
-#%%
-sns.distplot(d[d<=0.001],100)
+sns.distplot(d)
 
 #%%
 print(np.mean(d))

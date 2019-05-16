@@ -1,0 +1,2 @@
+# Lower the latency timer for the FTDI serial interface
+ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}="1"

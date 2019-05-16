@@ -22,27 +22,30 @@ print('Synchronizing')
 ## Assume that buffer overflows have lost synchronization to 9 byte packets
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
-K = 100 # This code works for 100 but not 1000. Maybe related to buffer size???
-x=ser.read(9*(K+1))
+K = 2 # This code works for 100 but not 1000. Maybe related to buffer size???
+MessageLen = 9
+x=ser.read(MessageLen*(K+1))
+assert(len(x) == MessageLen*(K+1))
 # Find offset in this set
 index = 0
 while(True):
+    print(x[index:])
     continueFlag = False
     for k in range(K):
-        if x[k+index] != 'E':
+        if ( x.index(b'E',index + k*MessageLen) - (k*MessageLen + index)) != 0:
             continueFlag = True
     if continueFlag:
         index = index + 1
-        # temp = x[index:index+k]
-        # print('{}: {}'.format(index, x))
     else:
         break
-    if (index > 8):
+    if (index > (MessageLen-1)):
+        print('Reached end with bad index')
+        assert(False)
         break
 
+print('Found index: {}'.format(index))
 
-x = ser.read(9-index) # read the last little bit of the bad block
-
+x = ser.read(index) # read the last little bit of the bad block
 
 #%%
 print('Capturing data')
@@ -52,12 +55,12 @@ FirstTSCaptured = False;
 
 with open('IntereventDataLatency.txt', 'w') as out_file:
   while(True):
-      x=ser.read(9)
-      if (len(x) == 9):
+      x=ser.read(MessageLen)
+      if (len(x) == MessageLen):
           last_ts = time.time()
           FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
           if FirstTSCaptured:
-            assert((MasterTime - lastMasterTime) == 10)
+            assert((MasterTime - lastMasterTime) == 2)
             out_file.write('{}\n'.format(last_ts - lastSystemTime))
           FirstTSCaptured = True;
           lastMasterTime = MasterTime;
