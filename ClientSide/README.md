@@ -50,6 +50,7 @@ results. Now, it mainly reports 1 ms results, which aren't particularly interest
 
 
 ### Using the Raspberry Pi interface
+When plugged into the Raspberry pi, the serial device is `/dev/ttyAMA0`, which is different from the default for the FT230 driver, which is `/dev/ttyUSB0`!
 
 To control GPIO with the Raspberry Pi, there are a number of libraries. Our favorite,
 `pigpio` is not yet working with a 64-bit kernel. The new kernel library for IO
