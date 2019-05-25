@@ -50,3 +50,19 @@ results. Now, it mainly reports 1 ms results, which aren't particularly interest
 
 
 ### Using the Raspberry Pi interface
+
+To control GPIO with the Raspberry Pi, there are a number of libraries. Our favorite,
+`pigpio` is not yet working with a 64-bit kernel. The new kernel library for IO
+is `libgpiod`. Hopefully we'll eventually switch to that interface. For now,
+we're using RPi.GPIO, which is a fairly standard Raspberry PI Python GPIO
+library. RPi.GPIO is also sensitive to architecture. See
+[here](https://alioth-lists.debian.net/pipermail/pkg-raspi-maintainers/Week-of-Mon-20190318/000333.html)
+for a description of what needs to be done to get it to work. Basically two
+things: (1) making sure that the CPU detection code doesn't rely on
+`/proc/cpuinfo` (this is already patched in RPi.GPIO, but a recent version needs
+to be used) and (2) making sure that `/dev/mem` can be accessed. As described in
+the link above, 
+> So, it fails to open /dev/mem. That's because the Debian kernel is
+> built with CONFIG_DEVMEM_STRICT=y. To work around that, we need to add
+> iomem=relaxed to the kernel command line in /boot/firmware/cmdline.txt
+
