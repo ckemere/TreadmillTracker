@@ -50,7 +50,22 @@ results. Now, it mainly reports 1 ms results, which aren't particularly interest
 
 
 ### Using the Raspberry Pi interface
-When plugged into the Raspberry pi, the serial device is `/dev/ttyAMA0`, which is different from the default for the FT230 driver, which is `/dev/ttyUSB0`!
+The shield does not work out of the box (with a Ubuntu server image). We need
+to mess with boot settings. General notes about the Raspberry Pi HW serial ports
+are [here](https://www.raspberrypi.org/documentation/configuration/uart.md). The
+upshot is that we need to do two things. 
+
+  - First, swap the bluetooth interface to the secondary MiniUART by adding a
+    line to `/boot/firmware/config.txt`, `dtoverlay=pi3-miniuart-bt`. (Note that
+    `dtoverlay=pi3-miniuart-bt` worked, but `pi3-disable-bt` didn't for some reason!)
+  - Second, we need to remove the debug console from the serial port, by
+    deleting the `console=serial0,115200` and `console=tty1` commands from
+    `/boot/firmware/cmdline.txt`.
+
+
+Then, when the shield is plugged into the Raspberry pi, the serial device is
+`/dev/ttyAMA0`, which is different from the default for the FT230 driver, which
+is `/dev/ttyUSB0`!
 
 To control GPIO with the Raspberry Pi, there are a number of libraries. Our favorite,
 `pigpio` is not yet working with a 64-bit kernel. The new kernel library for IO
@@ -63,7 +78,7 @@ things: (1) making sure that the CPU detection code doesn't rely on
 `/proc/cpuinfo` (this is already patched in RPi.GPIO, but a recent version needs
 to be used) and (2) making sure that `/dev/mem` can be accessed. As described in
 the link above, 
-> So, it fails to open /dev/mem. That's because the Debian kernel is
-> built with CONFIG_DEVMEM_STRICT=y. To work around that, we need to add
-> iomem=relaxed to the kernel command line in /boot/firmware/cmdline.txt
+> So, it fails to open `/dev/mem`. That's because the Debian kernel is
+> built with `CONFIG_DEVMEM_STRICT=y`. To work around that, we need to add
+> `iomem=relaxed` to the kernel command line in `/boot/firmware/cmdline.txt`
 
