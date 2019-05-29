@@ -89,6 +89,9 @@ the `cmdline.txt` file. See [README.md].
     rates - `GenerateTone.py`. Note that the gain was weird when we tried to
     write it as a mono file instead of stereo.
 
+  - Python script that sends OSC commands uses `oscpy` library. `pip3 install
+    oscpy` gets it.
+
 #### Command line
 
 example `oscsend "osc.udp://localhost:14161" "/mixer/channel/set_gain" if 2 -10.0`
