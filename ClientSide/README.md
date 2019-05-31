@@ -39,7 +39,11 @@ Now, setting the transmit rate to 5 ms, we find a median rate of 5 ms, with a ma
 measured over 27K messages! With a transmit rate of 2 ms, we find a median rate of 2 ms, with a
 max of 3.2 over 50K messages.
 
-An interesting and open question is how to set the latency timer for Windows or OSX.
+For Windows, we find instructions on how to set the latency timer here: [https://www.ftdichip.com/Support/Knowledgebase/index.html?settingacustomdefaultlaten.htm](https://www.ftdichip.com/Support/Knowledgebase/index.html?settingacustomdefaultlaten.htm). In summary, open the registry editor (`regedit`) and navigate to the key:
+`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\FTDIBUS\{Device VID, PID and serial number}\0000\Device Parameters\LatencyTimer`
+Then change its value to `1`.
+
+An interesting and open question is how to set the latency timer for OSX.
 
 ##### Closed loop latency
 Another way of measuring latency is to ask how fast we can see a change that we trigger.
