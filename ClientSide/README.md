@@ -54,7 +54,7 @@ results. Now, it mainly reports 1 ms results, which aren't particularly interest
 
 
 ### Using the Raspberry Pi interface
-The shield does not work out of the box (with a Ubuntu server image). We need
+The shield does not work out of the box (with a Ubuntu server image, e.g., ubuntu-19.04-preinstalled-server-armhf+raspi3.img.xz from here:[http://cdimage.ubuntu.com/releases/19.04/release/]). We need
 to mess with boot settings. General notes about the Raspberry Pi HW serial ports
 are [here](https://www.raspberrypi.org/documentation/configuration/uart.md). The
 upshot is that we need to do two things. 
