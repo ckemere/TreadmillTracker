@@ -2,6 +2,8 @@
 
 ## Basic Plan: JACK audio with a mixer controlled by OSC commands
 
+This has been tested on an updated Ubuntu 18.04 installation on the desktop and on a Ubuntu 19.04 server installation on the Raspberry Pi (i.e., ubuntu-19.04-preinstalled-server-armhf+raspi3.img.xz from here:[http://cdimage.ubuntu.com/releases/19.04/release/]).
+
 ### Testing
 
 ***Remember:*** If stuff is weird on the laptop it may be because anaconda has
