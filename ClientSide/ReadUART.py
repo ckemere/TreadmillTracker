@@ -22,7 +22,7 @@ print('Synchronizing')
 ## Assume that buffer overflows have lost synchronization to 9 byte packets
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
-K = 100 # This code works for 100 but not 1000. Maybe related to buffer size???
+K = 10 # This code works for 100 but not 1000. Maybe related to buffer size???
 x=ser.read(9*(K+1))
 # Find offset in this set
 index = 0
