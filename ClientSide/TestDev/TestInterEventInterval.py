@@ -4,23 +4,12 @@
 import time
 import serial
 import struct
-import argparse
-
-
-parser = argparse.ArgumentParser(description='Log experimental GPIO and wheel data from USB Treadmill Tracker interface.')
-parser.add_argument('port', metavar='P', default='/dev/ttyUSB0',
-                   help='TTY device for USB-serial interface (e.g., /dev/ttyUSB0 or COM10)')
-parser.add_argument('prefix', default='Wheel and IO Data Log - ',
-                   help='Prefix for output file - defaults to [Wheel and IO Data Log -]')
-parser.add_argument('filename', metavar='f', help='Output file name')
-
-args = parser.parse_args()
 
 
 #%%
-serialport = args.port
-ser = serial.Serial(port=serialport,
+ser = serial.Serial(port='COM6',
  baudrate = 256000,
+ # baudrate = 9600,
  parity=serial.PARITY_NONE,
  stopbits=serial.STOPBITS_ONE,
  bytesize=serial.EIGHTBITS,
@@ -59,33 +48,21 @@ print('Found index: {}'.format(index))
 x = ser.read(index) # read the last little bit of the bad block
 
 #%%
-import datetime
-import csv
+print('Capturing data')
+lastMasterTime = 0;
+lastSystemTime = 0;
+FirstTSCaptured = False;
 
-
-if args.filename is None:
-    now = datetime.datetime.now()
-    filename = '{}{}.txt'.format(args.prefix, now.strftime("%Y-%m-%d %H%M"))
-
-print('Capturing data to {}'.format(filename))
-lastMasterTime = 0
-lastSystemTime = 0
-FirstTSCaptured = False
-
-with open(filename, 'w', newline='') as out_file:
-  fieldnames = ['FlagChar', 'MasterTime', 'Encoder', 'GPIO', 'SystemTime']
-  writer = csv.writer(out_file)
-  writer.writerow(fieldnames)
+with open('IntereventDataLatency.txt', 'w') as out_file:
   while(True):
       x=ser.read(MessageLen)
       if (len(x) == MessageLen):
           last_ts = time.time()
           FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
           if FirstTSCaptured:
-            #out_file.write('{},{},{},{},{}\n'.format(FlagChar, MasterTime, Encoder, GPIO, last_ts))
-            writer.writerow([FlagChar, MasterTime, Encoder, GPIO, last_ts])
-
+            #assert((MasterTime - lastMasterTime) == 2)
+            out_file.write('{}\n'.format(last_ts - lastSystemTime))
           FirstTSCaptured = True;
-          out_file.flush()
-
+          lastMasterTime = MasterTime;
+          lastSystemTime = last_ts;
 
