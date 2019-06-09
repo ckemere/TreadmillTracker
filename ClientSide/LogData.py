@@ -6,13 +6,15 @@ import serial
 import struct
 import argparse
 
+### Maybe should add argcomplete for this program?
+
 
 parser = argparse.ArgumentParser(description='Log experimental GPIO and wheel data from USB Treadmill Tracker interface.')
-parser.add_argument('port', metavar='P', default='/dev/ttyUSB0',
+parser.add_argument('-P', '--port', default='/dev/ttyUSB0',
                    help='TTY device for USB-serial interface (e.g., /dev/ttyUSB0 or COM10)')
-parser.add_argument('prefix', default='Wheel and IO Data Log - ',
+parser.add_argument('--prefix', default='Wheel and IO Data Log - ',
                    help='Prefix for output file - defaults to [Wheel and IO Data Log -]')
-parser.add_argument('filename', metavar='f', help='Output file name')
+parser.add_argument('-f','--filename', help='Output file name')
 
 args = parser.parse_args()
 
