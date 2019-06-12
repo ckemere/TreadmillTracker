@@ -59,7 +59,7 @@ def setGPIO(value=False, pin=17):
 #%%
 
 from oscpy.client import OSCClient
-oscC = OSCClient('127.0.0.1', 12685)
+oscC = OSCClient('127.0.0.1', 12345)
 
 
 trigger = 0

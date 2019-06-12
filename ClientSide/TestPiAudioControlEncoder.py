@@ -48,7 +48,7 @@ print('Found index: {}'.format(index))
 x = ser.read(index) # read the last little bit of the bad block
 
 from oscpy.client import OSCClient
-oscC = OSCClient('127.0.0.1', 13724)
+oscC = OSCClient('127.0.0.1', 12345)
 
 
 
