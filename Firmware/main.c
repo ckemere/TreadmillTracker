@@ -116,9 +116,8 @@ int main(void)
     quadrature_init();
     uart_init();
 
-    P3DIR = 0x0F;
-    P3REN = 0xF0;
-    P3OUT = 0x5F;
+    P3DIR = 0x00;
+    //P3REN = 0xF0;
     //P3OUT = 0x55; // set pull ups
   
     __bis_SR_register(GIE);
