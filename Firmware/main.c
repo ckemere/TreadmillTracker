@@ -96,8 +96,6 @@ int main(void)
     quadrature_init();
     uart_init();
 
-    UnwrappedEncoder = 100000;
-
     pTreadmillData = &TreadmillData;
 
     TreadmillData.StartChar = 'E';
