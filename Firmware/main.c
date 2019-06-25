@@ -103,8 +103,8 @@ int main(void)
     TreadmillData.DataLength = sizeof(TreadmillData);
 
     P3DIR = 0x00;
-    P3REN = 0xFF; // Turn on pull up/down resistors
-    P3OUT = 0; // Set to pull down
+    //P3REN = 0xFF; // Turn on pull up/down resistors
+    //P3OUT = 0; // Set to pull down
   
     __bis_SR_register(GIE);
 
