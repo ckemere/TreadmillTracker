@@ -35,8 +35,8 @@ print('Synchronizing')
 ## Assume that buffer overflows have lost synchronization to 9 byte packets
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
-K = 2 # This code works for 100 but not 1000. Maybe related to buffer size???
-MessageLen = 9
+K = 3 # This code works for 100 but not 1000. Maybe related to buffer size???
+MessageLen = 14
 x=ser.read(MessageLen*(K+1))
 assert(len(x) == MessageLen*(K+1))
 print(x)
@@ -65,13 +65,13 @@ x = ser.read(index) # read the last little bit of the bad block
 lastMasterTime = 0;
 lastSystemTime = 0;
 while(True):
-    x=ser.read(9)
+    x=ser.read(MessageLen)
     last_ts = time.time()
-    if (len(x) == 9):
-        FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
+    if (len(x) == MessageLen):
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhLBx', x)
         # FlagChar, GPIO, MasterTime, Encoder  = struct.unpack('>cBLhx', x)
-        print('Flag: {}. Clocks: {}. Encoder: {}. GPIO: 0x{:08b}'.format( 
-            FlagChar, MasterTime, Encoder, GPIO))
+        print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
+            FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
         print('Elapsed: {} ({})'.format(MasterTime - lastMasterTime, last_ts - lastSystemTime))
         lastMasterTime = MasterTime;
         lastSystemTime = last_ts;

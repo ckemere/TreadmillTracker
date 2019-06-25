@@ -36,7 +36,7 @@ print('Synchronizing')
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
 K = 2 # This code works for 100 but not 1000. Maybe related to buffer size???
-MessageLen = 9
+MessageLen = 14
 x=ser.read(MessageLen*(K+1))
 assert(len(x) == MessageLen*(K+1))
 # Find offset in this set
@@ -75,17 +75,17 @@ lastSystemTime = 0
 FirstTSCaptured = False
 
 with open(filename, 'w', newline='') as out_file:
-  fieldnames = ['FlagChar', 'MasterTime', 'Encoder', 'GPIO', 'SystemTime']
+  fieldnames = ['FlagChar', 'MasterTime', 'Encoder', 'UnwrappedEncoder', 'GPIO', 'SystemTime']
   writer = csv.writer(out_file)
   writer.writerow(fieldnames)
   while(True):
       x=ser.read(MessageLen)
       if (len(x) == MessageLen):
           last_ts = time.time()
-          FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
+          FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhLBx', x)
           if FirstTSCaptured:
             #out_file.write('{},{},{},{},{}\n'.format(FlagChar, MasterTime, Encoder, GPIO, last_ts))
-            writer.writerow([FlagChar, MasterTime, Encoder, GPIO, last_ts])
+            writer.writerow([FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO, last_ts])
 
           FirstTSCaptured = True;
           out_file.flush()

@@ -17,25 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/******************************************************************************
- * Hardware UART example for MSP430.
- *
- * Stefan Wendler
- * sw@kaltpost.de
- * http://gpio.kaltpost.de
- *
- * Echos back each character received. Blinks green LED in main loop. Toggles
- * red LED on RX.
- *
- * Use /dev/ttyACM0 at 9600 Bauds (and 8,N,1).
- *
- * Note: RX-TX must be swaped when using the MSPg2553 with the Launchpad! 
- *       You could easliy do so by crossing RX/TX on the jumpers of the 
- *       Launchpad.
- ******************************************************************************/
 
 #include "Quadrature.h"
 #include "uart.h"
+#include "TreadmillDataStruct.h"
+
 
 #include <msp430.h>
 #include <stdint.h>
@@ -47,18 +33,12 @@
 
 volatile uint16_t MasterClockHigh = 0;
 
+TreadmillDataStruct TreadmillData;
+unsigned char *pTreadmillData;
 
-char *cEncoderTicksPtr;
-char *cMasterClockHighPtr;
-char *cMasterClockLowPtr;
 
 void SendData()
 {
-    register uint16_t MasterClockHighCopy;
-    register uint16_t MasterClockLowCopy;
-    register int16_t  EncoderTicksCopy;
-    register unsigned char GPIO;
-
     // NOTE: We're using POLLING for serial comms to make
     //   sure that if there's a conflict between timing
     //   or quadrature measurements and data x-mission,
@@ -66,25 +46,25 @@ void SendData()
 
     // Copy current clock and encoder data atomically.
     __disable_interrupt();
-    MasterClockHighCopy = MasterClockHigh;
-    MasterClockLowCopy = TA0R;
-    EncoderTicksCopy = EncoderTicks;
-    GPIO = P3IN;
-    __enable_interrupt();
+
+    /*
+    TreadmillData.MasterClockLow = TA0R;
+    TreadmillData.MasterClockHigh = MasterClockHigh;
+    TreadmillData.EncoderTicks = EncoderTicks;
+    TreadmillData.UnwrappedEncoderTicks = UnwrappedEncoder;
+    TreadmillData.GPIO = P3IN;    
+    */
     
-    uart_putc('E');
- 
-    // Send timestamp (remember that we're little endian)
-    uart_putw(MasterClockHighCopy); 
-    uart_putw(MasterClockLowCopy); 
+    *(uint16_t *)(&pTreadmillData[2]) = TA0R;
+    *(uint16_t *)(&pTreadmillData[4]) = MasterClockHigh;
+    *(int16_t *)(&pTreadmillData[6]) = EncoderTicks;
+    *(int32_t *)(&pTreadmillData[8]) = UnwrappedEncoder;
+    pTreadmillData[12] = P3IN;
 
-    // Send wheel data
-    uart_putw(EncoderTicksCopy);
+    __enable_interrupt();
 
-   // Send GPIO data
-    uart_putc(GPIO);
+    uart_put_treadmill_struct((unsigned char *)&TreadmillData);
 
-    uart_putc('\n');
     return;
 }
 
@@ -116,16 +96,24 @@ int main(void)
     quadrature_init();
     uart_init();
 
+    UnwrappedEncoder = 100000;
+
+    pTreadmillData = &TreadmillData;
+
+    TreadmillData.StartChar = 'E';
+    TreadmillData.EndChar = '\n';
+    TreadmillData.DataLength = sizeof(TreadmillData);
+
     P3DIR = 0x00;
-    //P3REN = 0xF0;
-    //P3OUT = 0x55; // set pull ups
+    P3REN = 0xFF; // Turn on pull up/down resistors
+    P3OUT = 0; // Set to pull down
   
     __bis_SR_register(GIE);
 
     while(1) {
      LED_POUT ^= STATUS_LED;       // Toggle LED using exclusive-OR
      if (NewGPIOFlag) {
-       P3OUT = NewGPIO;
+       //P3OUT = NewGPIO;
        NewGPIOFlag = 0;
      }
      SendData();
@@ -136,8 +124,9 @@ int main(void)
 
 // Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-#pragma vector=TIMER0_A0_VECTOR
-__interrupt void WakeupClockISR (void)
+//#pragma vector=TIMER0_A0_VECTOR
+//__interrupt void WakeupClockISR (void)
+void __attribute__((interrupt(TIMER0_A0_VECTOR))) WakeupClockISR (void)
 {
   //TA0CCR0 += 100;
   //__bic_SR_register_on_exit(CPUOFF);
@@ -151,8 +140,9 @@ __interrupt void WakeupClockISR (void)
 
 // Timer A0 overflow interrupt service routine => increment higher 16bit counter
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
-#pragma vector=TIMER0_A1_VECTOR
-__interrupt void MasterClockISR (void)
+//#pragma vector=TIMER0_A1_VECTOR
+//__interrupt void MasterClockISR (void)
+void __attribute__((interrupt(TIMER0_A1_VECTOR))) MasterClockISR (void)
 {
   //if (TA0IV & TAIFG)
   //  MasterClockHigh++;
