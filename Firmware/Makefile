@@ -7,7 +7,7 @@ MSPDEBUG=mspdebug
 
 DEVICE=msp430g2553
 
-PROJECT=treadmill
+PROJECT=treadmill.elf
 
 SRC=main.c Quadrature.c uart.c
 
@@ -25,6 +25,11 @@ $(PROJECT): $(OBJ)
 
 flash: $(PROJECT)
 	LD_LIBRARY_PATH=$(TILIBPATH) $(MSPDEBUG) tilib 'prog $(PROJECT)'
+
+# To debug, you first call `mspdebug tilib` (probably need the library path too.
+# Then, 'prog treadmill.elf', followed by 'gdb'. Then in a different terminal,
+# run the msp430 gdb. Then, 'target remote localhost:2000' (that's the usual port
+# that gets opened), followed by 'file treadmill.elf'. Then you're debugging!
 
 clean:
 	rm -f *.o
