@@ -1,5 +1,5 @@
 
-#include "Quadrature.h"
+#include "quadrature.h"
 
 volatile uint16_t IndexTicks = 0;
 volatile int16_t EncoderTicks = 0;

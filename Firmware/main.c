@@ -18,7 +18,7 @@
  */
 
 
-#include "Quadrature.h"
+#include "quadrature.h"
 #include "uart.h"
 #include "TreadmillDataStruct.h"
 

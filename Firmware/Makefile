@@ -9,7 +9,7 @@ DEVICE=msp430g2553
 
 PROJECT=treadmill.elf
 
-SRC=main.c Quadrature.c uart.c
+SRC=main.c quadrature.c uart.c
 
 OBJ=$(SRC:.c=.o)
 
