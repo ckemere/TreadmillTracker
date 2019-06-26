@@ -15,6 +15,10 @@ OBJ=$(SRC:.c=.o)
 
 CC=$(CCPREFIX)/bin/msp430-elf-gcc
 # -Wextra removed to get rid of -Wold-style-declaration warnings
+# -ggdb include gdb debugging symbol information 
+# -Wa,-ahldn produces a memory map with the assembly.  Can be pretty handy
+# -gdwarf-2 includes more symbol information for gdb 
+# -g3 includes more symbol information for gdb 
 CFLAGS=-mmcu=$(DEVICE) -I. -I $(INCPREFIX)/include -ggdb -g3 -Os -pipe -pedantic -Wall# -Wextra 
 LFLAGS=-L $(INCPREFIX)/include -lgcc
 
@@ -30,6 +34,7 @@ flash: $(PROJECT)
 # Then, 'prog treadmill.elf', followed by 'gdb'. Then in a different terminal,
 # run the msp430 gdb. Then, 'target remote localhost:2000' (that's the usual port
 # that gets opened), followed by 'file treadmill.elf'. Then you're debugging!
+# See here: https://sites.google.com/site/yeltrow/msp430-gcc-opensource-on-ubuntu
 
 clean:
 	rm -f *.o
