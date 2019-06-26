@@ -9,7 +9,7 @@ volatile int32_t UnwrappedEncoder = 0;
 
 void quadrature_init(void)
 {
-    EncPIE |= BitA;
+    EncPIE |= BitA + BitZ;
     EncPIFG = 0;
 }
 
@@ -161,11 +161,8 @@ void __attribute__((interrupt(PORT2_VECTOR))) QuadratureISR (void)
   }
 
   if ((EncPIFG & BitZ) > 0) {
-    if ((EncPIN & BitZ) == BitZ) {
-      EncoderTicks = 0;
-    }
+    EncoderTicks = 0;
     EncPIFG &= ~(BitZ);
-    EncPIE |= BitZ; // Disable for a while
   }
 
 }  

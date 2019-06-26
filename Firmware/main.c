@@ -82,7 +82,13 @@ int main(void)
     BCSCTL1 = CALBC1_8MHZ;   // Set range
     DCOCTL = CALDCO_8MHZ;    // Set DCO step + modulation
     
+    // Make sure everything is reset!
     P1DIR = 0x00;
+    P2DIR = 0x00;
+    P3DIR = 0x00;
+    P1IE = 0x00;
+    P2IE = 0x00;
+    
     P1SEL = 0x01;
     P1SEL2 = 0x00;
     TA0CTL = TASSEL_0 + MC_2 + ID_1 + TAIE + TACLR;  // TA0CLK Input (2KHz), 
@@ -93,19 +99,18 @@ int main(void)
     LED_PDIR |= STATUS_LED + PWR_LED;     
     LED_POUT |= STATUS_LED + PWR_LED;     // All LEDs on
 
-    quadrature_init();
-    uart_init();
-
     pTreadmillData = &TreadmillData;
-
     TreadmillData.StartChar = 'E';
     TreadmillData.EndChar = '\n';
     TreadmillData.DataLength = sizeof(TreadmillData);
 
-    P3DIR = 0x00;
+    P3DIR = 0x00; // No one else should be using Port 3!!!
     //P3REN = 0xFF; // Turn on pull up/down resistors
     //P3OUT = 0; // Set to pull down
-  
+
+    quadrature_init();
+    uart_init();
+
     __bis_SR_register(GIE);
 
     while(1) {
