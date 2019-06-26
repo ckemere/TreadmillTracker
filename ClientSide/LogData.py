@@ -82,7 +82,7 @@ with open(filename, 'w', newline='') as out_file:
       x=ser.read(MessageLen)
       if (len(x) == MessageLen):
           last_ts = time.time()
-          FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhLBx', x)
+          FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
           if FirstTSCaptured:
             #out_file.write('{},{},{},{},{}\n'.format(FlagChar, MasterTime, Encoder, GPIO, last_ts))
             writer.writerow([FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO, last_ts])

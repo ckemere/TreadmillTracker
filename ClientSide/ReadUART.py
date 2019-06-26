@@ -68,7 +68,7 @@ while(True):
     x=ser.read(MessageLen)
     last_ts = time.time()
     if (len(x) == MessageLen):
-        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhLBx', x)
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
         # FlagChar, GPIO, MasterTime, Encoder  = struct.unpack('>cBLhx', x)
         print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
             FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
