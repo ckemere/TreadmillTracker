@@ -98,7 +98,7 @@ void uart_putw(unsigned int w)
 
 void uart_put_treadmill_struct(unsigned char *dptr)
 {
-    register char *eptr = dptr + sizeof(TreadmillDataStruct);
+    register unsigned char *eptr = dptr + sizeof(TreadmillDataStruct);
     while (eptr != dptr) {
       while (!(IFG2&UCA0TXIFG));              // USCI_A0 TX buffer ready?
       UCA0TXBUF = *dptr++;                        // TX
