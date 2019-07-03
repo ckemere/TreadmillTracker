@@ -10,7 +10,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
-parser.add_argument('-P', '--serial-port', default='/dev/ttyUSB0',
+parser.add_argument('-P', '--serial-port', default='/dev/ttyS0',
                    help='TTY device for USB-serial interface (e.g., /dev/ttyUSB0 or COM10)')
 parser.add_argument('-O', '--osc-port', type=int, default=12345, 
                    help='Serial port for OSC client')
@@ -146,19 +146,18 @@ PreDispenseToneDelay = 20
 PostDispenseToneDelay = 80
 SubsequentBetweenDispensingDelay = 500
 
-#%%
-from subprocess import Popen, DEVNULL
+# Initialization
 
 CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
 PinkNoiseStim = Sounds(SoundType.PinkNoise)
 ToneCloudStim = Sounds(SoundType.ToneCloud)
 ToneStim = Sounds(SoundType.Tone)
-PinkNoiseStim.Play()
-ToneCloudStim.Stop()
 
-CurrentPokeState = PokeSubstates.NotPoked
-DelayEnd = 0
+
+#%%
+from subprocess import Popen, DEVNULL
+
 
 # Dispense on both ends to prime
 Well = Wells()
@@ -166,88 +165,97 @@ Well.LeftDispense()
 Well.RightDispense()
 
 with Popen(['/usr/local/bin/jackminimix', '-a', '-p', '12345'],
-            stdout=DEVNULL) as p_jackminimix, \
-        Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
+        stdout=DEVNULL) as p_jackminimix:
+    time.sleep(1)
+    with Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
             '-a=minimixer:in1_right', 'pink_noise.wav'], stdout=DEVNULL, stderr=DEVNULL) as p_pinknoise, \
         Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
-            '-a=minimixer:in2_right', 'tone_cloud_gating.wav'], stdout=DEVNULL,
+            '-a=minimixer:in2_right', 'tone_cloud_no_gating.wav'], stdout=DEVNULL,
             stderr=DEVNULL) as p_tone_cloud, \
         open(filename, 'w', newline='') as log_file:
 
-    writer = csv.writer(log_file)
-    print('Starting Master Loop')
-    while(True):
-        x=ser.read(MessageLen)
-        last_ts = time.time()
-        assert(len(x)==MessageLen)
-        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
-        
-        writer.writerow([MasterTime, GPIO, last_ts])
+        writer = csv.writer(log_file)
+        print('Getting ready to start')
+        time.sleep(5)
+        PinkNoiseStim.Play()
+        ToneCloudStim.Stop()
 
-        #print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
-        #    FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
+        CurrentPokeState = PokeSubstates.NotPoked
+        DelayEnd = 0
 
-        IsLeftWellPoked = (GPIO & Well.LeftPokeMask) > 0
-        IsRightWellPoked = (GPIO & Well.RightPokeMask) > 0
+        print('Starting Master Loop')
+        while(True):
+            x=ser.read(MessageLen)
+            last_ts = time.time()
+            assert(len(x)==MessageLen)
+            FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
+            
+            writer.writerow([MasterTime, GPIO, last_ts])
 
-        if (IsLeftWellPoked and IsRightWellPoked):
-            raise Exception('Error: both Nose Pokes Activated')
+            #print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
+            #    FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
 
-        if CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight):
-            if not (IsLeftWellPoked or IsRightWellPoked): # Change in state
-                print('Poked to not')
-                ToneCloudStim.Stop()
-                ToneStim.Stop()
-                PinkNoiseStim.Play()
-                DelayEnd = 0
-                CurrentPokeState = PokeSubstates.NotPoked
-                if CurrentMazeState == MazeStates.PokedLeft:
-                    ValidNextMazeState = MazeStates.PokedRight
-                    print('Next state right')
-                elif CurrentMazeState == MazeStates.PokedRight:
-                    ValidNextMazeState = MazeStates.PokedLeft
-                    print('Next state left')
-                CurrentMazeState = MazeStates.NotPoked
+            IsLeftWellPoked = (GPIO & Well.LeftPokeMask) > 0
+            IsRightWellPoked = (GPIO & Well.RightPokeMask) > 0
 
-                continue
-            else:
-                if (MasterTime > DelayEnd): # Time for a state transition!
-                    if CurrentPokeState == PokeSubstates.BetweenDispensingDelay:
-                        ToneStim.Play()
-                        DelayEnd = MasterTime + PreDispenseToneDelay
-                        CurrentPokeState = PokeSubstates.PreDispenseToneDelay
-                    elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
-                        if IsLeftWellPoked:
-                            Well.LeftDispense()
-                        elif IsRightWellPoked:
-                            Well.RightDispense()
-                        else:
-                            raise Exception('Error in dispense state configuration.')
-                        DelayEnd = MasterTime + PostDispenseToneDelay
-                        CurrentPokeState = PokeSubstates.PostDispenseToneDelay
-                    elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
-                        ToneStim.Stop()
-                        DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
-                        CurrentPokeState = PokeSubstates.BetweenDispensingDelay
-                    else:
-                        raise Exception('Error in PokeSubstates state configuration.')
+            if (IsLeftWellPoked and IsRightWellPoked):
+                raise Exception('Error: both Nose Pokes Activated')
 
+            if CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight):
+                if not (IsLeftWellPoked or IsRightWellPoked): # Change in state
+                    print('Poked to not')
+                    ToneCloudStim.Stop()
+                    ToneStim.Stop()
+                    PinkNoiseStim.Play()
+                    DelayEnd = 0
+                    CurrentPokeState = PokeSubstates.NotPoked
+                    if CurrentMazeState == MazeStates.PokedLeft:
+                        ValidNextMazeState = MazeStates.PokedRight
+                        print('Next state right')
+                    elif CurrentMazeState == MazeStates.PokedRight:
+                        ValidNextMazeState = MazeStates.PokedLeft
+                        print('Next state left')
+                    CurrentMazeState = MazeStates.NotPoked
 
-        else: # NotPoked state
-            if IsLeftWellPoked or IsRightWellPoked: # Gone from Not Poked to PokedLeft or PokedRight
-                if (ValidNextMazeState == MazeStates.PokedEither):
-                    CurrentMazeState = MazeStates.PokedLeft if IsLeftWellPoked else MazeStates.PokedRight
-                elif IsLeftWellPoked and (ValidNextMazeState == MazeStates.PokedLeft):
-                    CurrentMazeState = MazeStates.PokedLeft
-                elif IsRightWellPoked and (ValidNextMazeState == MazeStates.PokedRight):
-                    CurrentMazeState = MazeStates.PokedRight
+                    continue
                 else:
-                    continue # The animal tried to poke again in a non-rewarding well
-                print('Not to poked')
-                ValidNextMazeState = MazeStates.NotPoked
-                PinkNoiseStim.Stop()
-                ToneCloudStim.Play()
-                CurrentPokeState = PokeSubstates.BetweenDispensingDelay
-                DelayEnd = MasterTime + FirstBetweenDispensingDelay
-            else:
-                pass # Still not poked!
+                    if (MasterTime > DelayEnd): # Time for a state transition!
+                        if CurrentPokeState == PokeSubstates.BetweenDispensingDelay:
+                            ToneStim.Play()
+                            DelayEnd = MasterTime + PreDispenseToneDelay
+                            CurrentPokeState = PokeSubstates.PreDispenseToneDelay
+                        elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
+                            if IsLeftWellPoked:
+                                Well.LeftDispense()
+                            elif IsRightWellPoked:
+                                Well.RightDispense()
+                            else:
+                                raise Exception('Error in dispense state configuration.')
+                            DelayEnd = MasterTime + PostDispenseToneDelay
+                            CurrentPokeState = PokeSubstates.PostDispenseToneDelay
+                        elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
+                            ToneStim.Stop()
+                            DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
+                            CurrentPokeState = PokeSubstates.BetweenDispensingDelay
+                        else:
+                            raise Exception('Error in PokeSubstates state configuration.')
+
+
+            else: # NotPoked state
+                if IsLeftWellPoked or IsRightWellPoked: # Gone from Not Poked to PokedLeft or PokedRight
+                    if (ValidNextMazeState == MazeStates.PokedEither):
+                        CurrentMazeState = MazeStates.PokedLeft if IsLeftWellPoked else MazeStates.PokedRight
+                    elif IsLeftWellPoked and (ValidNextMazeState == MazeStates.PokedLeft):
+                        CurrentMazeState = MazeStates.PokedLeft
+                    elif IsRightWellPoked and (ValidNextMazeState == MazeStates.PokedRight):
+                        CurrentMazeState = MazeStates.PokedRight
+                    else:
+                        continue # The animal tried to poke again in a non-rewarding well
+                    print('Not to poked')
+                    ValidNextMazeState = MazeStates.NotPoked
+                    PinkNoiseStim.Stop()
+                    ToneCloudStim.Play()
+                    CurrentPokeState = PokeSubstates.BetweenDispensingDelay
+                    DelayEnd = MasterTime + FirstBetweenDispensingDelay
+                else:
+                    pass # Still not poked!
