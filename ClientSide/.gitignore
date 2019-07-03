@@ -1,0 +1,7 @@
+# Python
+*.pyc
+.ipynb_checkpoints
+
+# Specific config files
+60-wifi.yaml
+cloud.cfg
