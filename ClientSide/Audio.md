@@ -14,11 +14,11 @@ install - ubuntustudio-controls jack-tools ubuntustudio-performance-tweaks
 
 #### jackminimix
 [https://github.com/njh/jackminimix/]
+
 liblo-tools liblo-dev libjack-jackd2-dev autotools-dev, autoconf
 
 Note that there's a 'GAIN_FADE_RATE` value which is defined as 400 db/minute.
 This gives nice transitions, but extends sounds a bit.
-https://github.com/njh/jackminimix/
 
 #### jackmeter
 Useful to see stuff working
