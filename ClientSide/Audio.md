@@ -26,6 +26,8 @@ Useful to see stuff working
 #### sndfile-jackplay
 [https://github.com/erikd/sndfile-tools/]
 
+libtool libsndfile1-dev libsamplerate0-dev libfftw3-dev libcairo2-dev
+
 #### GPIO
 
 To install the newest and greatest RPi.GPIO, we have to `pip` from the source
