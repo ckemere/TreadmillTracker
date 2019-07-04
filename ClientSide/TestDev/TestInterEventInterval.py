@@ -7,7 +7,7 @@ import struct
 
 
 #%%
-ser = serial.Serial(port='/dev/ttyUSB0',
+ser = serial.Serial(port='COM6',
  baudrate = 256000,
  # baudrate = 9600,
  parity=serial.PARITY_NONE,
@@ -60,7 +60,7 @@ with open('IntereventDataLatency.txt', 'w') as out_file:
           last_ts = time.time()
           FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
           if FirstTSCaptured:
-            assert((MasterTime - lastMasterTime) == 2)
+            #assert((MasterTime - lastMasterTime) == 2)
             out_file.write('{}\n'.format(last_ts - lastSystemTime))
           FirstTSCaptured = True;
           lastMasterTime = MasterTime;

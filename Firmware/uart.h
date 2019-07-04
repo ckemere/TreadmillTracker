@@ -30,6 +30,7 @@
 #define __UART_H
 
 #include <stdint.h>
+#include "TreadmillDataStruct.h"
 
 extern unsigned char NewGPIO;
 extern unsigned char NewGPIOFlag;
@@ -54,5 +55,8 @@ unsigned char uart_getc();
 void uart_putc(unsigned char c);
 
 void uart_putw(unsigned int w);
+
+void uart_put_treadmill_struct(unsigned char *data);
+
 
 #endif
