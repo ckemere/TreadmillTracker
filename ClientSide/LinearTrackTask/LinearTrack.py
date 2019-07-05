@@ -172,6 +172,9 @@ with Popen(['/usr/local/bin/jackminimix', '-a', '-p', '12345'],
         Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
             '-a=minimixer:in2_right', 'tone_cloud_no_gating.wav'], stdout=DEVNULL,
             stderr=DEVNULL) as p_tone_cloud, \
+        Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
+            '-a=minimixer:in3_right', 'tone.wav'], stdout=DEVNULL,
+            stderr=DEVNULL) as p_tone, \
         open(filename, 'w', newline='') as log_file:
 
         writer = csv.writer(log_file)
@@ -179,6 +182,7 @@ with Popen(['/usr/local/bin/jackminimix', '-a', '-p', '12345'],
         time.sleep(5)
         PinkNoiseStim.Play()
         ToneCloudStim.Stop()
+        ToneStim.Stop()
 
         CurrentPokeState = PokeSubstates.NotPoked
         DelayEnd = 0
