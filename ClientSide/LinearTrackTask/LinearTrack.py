@@ -137,6 +137,13 @@ CurrentPokeState = PokeSubstates.NotPoked
 DelayEnd = 0
 
 #%%
+################
+# With the serial data stream, because the rate of transfer is so high, the input buffer will
+# over flow quite rapidly. So the following chunk of code (which connects,  empties out the
+# buffer and gets things aligned on individual messages) needs to be run as closely as possible
+# to the actual start of data transfer!
+
+print('Connecting to serial/USB interface {} and synchronizing.'.format(args.serial_port))
 ser = serial.Serial(port=args.serial_port,
  baudrate = 256000,
  parity=serial.PARITY_NONE,
@@ -145,8 +152,6 @@ ser = serial.Serial(port=args.serial_port,
  timeout=0.2
 )
 
-
-print('Synchronizing')
 ## Assume that buffer overflows have lost synchronization to 9 byte packets
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
@@ -154,7 +159,7 @@ K = 3 # This code works for 100 but not 1000. Maybe related to buffer size???
 MessageLen = 14
 x=ser.read(MessageLen*(K+1))
 assert(len(x) == MessageLen*(K+1))
-print(x)
+# print(x) # useful for debugging....
 # Find offset in this set
 index = 0
 while(True):
