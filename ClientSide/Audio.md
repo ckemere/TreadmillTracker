@@ -2,6 +2,8 @@
 
 ## Basic Plan: JACK audio with a mixer controlled by OSC commands
 
+This has been tested on an updated Ubuntu 18.04 installation on the desktop and on a Ubuntu 19.04 server installation on the Raspberry Pi (i.e., ubuntu-19.04-preinstalled-server-armhf+raspi3.img.xz from here:[http://cdimage.ubuntu.com/releases/19.04/release/]).
+
 ### Testing
 
 ***Remember:*** If stuff is weird on the laptop it may be because anaconda has
@@ -62,8 +64,10 @@ the `cmdline.txt` file. See [README.md].
           buffers, and `-P hw:1,0` set the proper soundcard) We could also add
           a `-r 192000` to set the sampling rate.
 
-       2. Start the minimixer: `jackminimix -a` (optionally `-v` to see commands
-          coming through.
+       2. Start the minimixer: `jackminimix -a -p 12345` (optionally `-v` to
+	  see commands coming through.) Note that `12345` is the port for osc
+          control. You can change it to something else, but make sure your other
+          code matches.
 
        3. Start an audio loop playing into the mixer: `./PlaySound/jplay -l0
           -a=minimixer:in1_right 15khz_sine.wav`
@@ -94,4 +98,4 @@ the `cmdline.txt` file. See [README.md].
 
 #### Command line
 
-example `oscsend "osc.udp://localhost:14161" "/mixer/channel/set_gain" if 2 -10.0`
+example `oscsend "osc.udp://localhost:12345" "/mixer/channel/set_gain" if 2 -10.0`
