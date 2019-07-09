@@ -104,7 +104,7 @@ int main(void)
     TreadmillData.EndChar = '\n';
     TreadmillData.DataLength = sizeof(TreadmillData);
 
-    P3DIR = 0xC0; // No one else should be using Port 3!!!
+    P3DIR = 0xE0; // No one else should be using Port 3!!!
     //P3REN = 0xFF; // Turn on pull up/down resistors
     P3OUT = 0; // Set to pull down
 
