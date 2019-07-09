@@ -99,14 +99,14 @@ int main(void)
     LED_PDIR |= STATUS_LED + PWR_LED;     
     LED_POUT |= STATUS_LED + PWR_LED;     // All LEDs on
 
-    pTreadmillData = &TreadmillData;
+    pTreadmillData = (unsigned char*) &TreadmillData;
     TreadmillData.StartChar = 'E';
     TreadmillData.EndChar = '\n';
     TreadmillData.DataLength = sizeof(TreadmillData);
 
-    P3DIR = 0x00; // No one else should be using Port 3!!!
+    P3DIR = 0xC0; // No one else should be using Port 3!!!
     //P3REN = 0xFF; // Turn on pull up/down resistors
-    //P3OUT = 0; // Set to pull down
+    P3OUT = 0; // Set to pull down
 
     quadrature_init();
     uart_init();
@@ -115,11 +115,14 @@ int main(void)
 
     while(1) {
      LED_POUT ^= STATUS_LED;       // Toggle LED using exclusive-OR
+
      if (NewGPIOFlag) {
-       //P3OUT = NewGPIO;
+       P3OUT = NewGPIO;
        NewGPIOFlag = 0;
      }
+
      SendData();
+
      __bis_SR_register(CPUOFF + GIE); // Enter LPM0 w/ interrupts
     } 
 }

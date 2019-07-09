@@ -6,6 +6,9 @@ import serial
 import struct
 import argparse
 
+from oscpy.client import OSCClient
+
+
 ### Maybe should add argcomplete for this program?
 
 
@@ -33,8 +36,6 @@ if False:
 
 
 #%%
-from oscpy.client import OSCClient
-oscC = OSCClient('127.0.0.1', args.osc_port)
 
 #%%
 import datetime
@@ -55,6 +56,7 @@ class PokeSubstates(Enum):
     NotPoked = auto()
     BetweenDispensingDelay = auto()
     PreDispenseToneDelay = auto()
+    PostDispenseDelay = auto()
     PostDispenseToneDelay = auto()
 
 class SoundType(Enum):
@@ -66,35 +68,39 @@ class SoundType(Enum):
 
 class Sounds:
     def __init__(self, WhichSound=SoundType.NoSound,
-            OnVolume=0.0, OffVolume=-1000.0):
+            OnVolume=0.0, OffVolume=-1000.0,
+            OscPort=None):
         self.sound = WhichSound
         self.OnVolume = float(OnVolume)
         self.OffVolume = float(OffVolume)
+        if OscPort is not None:
+            self.oscC = OSCClient('127.0.0.1', int(OscPort))
+        else:
+            self.oscC = OSCClient('127.0.0.1', 12345)
 
     def Play(self):
         if self.sound is not SoundType.NoSound:
-            oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume])
+            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume])
             print('Playing ', self.sound.name)
 
     def Stop(self):
         if self.sound is not SoundType.NoSound:
-            oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
+            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
             print('Stopping ', self.sound.name)
 
 
 #%%
-class Wells:
+class WellData:
     LeftPokeMask = 0x01
-    RightPokeMask = 0x40
+    RightPokeMask = 0x02
 
-    def LeftDispense(self):
-        print('Dispensing left well')
-    def RightDispense(self):
-        print('Dispensing right well')
+    LeftDispenseMask = b'\x40'
+    RightDispenseMask = b'\x80'
 
 #%%
 FirstBetweenDispensingDelay = 250
 PreDispenseToneDelay = 150
+PostDispenseDelay = 100
 PostDispenseToneDelay = 350
 SubsequentBetweenDispensingDelay = 1000
 
@@ -102,20 +108,15 @@ SubsequentBetweenDispensingDelay = 1000
 
 CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
-PinkNoiseStim = Sounds(SoundType.PinkNoise, 0.0, -1000.0)
-ToneCloudStim = Sounds(SoundType.ToneCloud, -9.0, -1000.0)
-ToneStim = Sounds(SoundType.Tone, 0.0, -1000.0)
-
+PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
+ToneCloudStim = Sounds(SoundType.ToneCloud, OnVolume=-12.0, OffVolume=-1000.0, OscPort=args.osc_port)
+ToneStim = Sounds(SoundType.Tone, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
 
 #%%
 from subprocess import Popen, DEVNULL
 
-
 # Dispense on both ends to prime
-Well = Wells()
-Well.LeftDispense()
-Well.RightDispense()
-
+Well = WellData()
 
 # with open(filename, 'w', newline='') as log_file:
     # writer = csv.writer(log_file)
@@ -142,58 +143,72 @@ DelayEnd = 0
 # over flow quite rapidly. So the following chunk of code (which connects,  empties out the
 # buffer and gets things aligned on individual messages) needs to be run as closely as possible
 # to the actual start of data transfer!
-
 print('Connecting to serial/USB interface {} and synchronizing.'.format(args.serial_port))
-ser = serial.Serial(port=args.serial_port,
- baudrate = 256000,
- parity=serial.PARITY_NONE,
- stopbits=serial.STOPBITS_ONE,
- bytesize=serial.EIGHTBITS,
- timeout=0.2
-)
 
-## Assume that buffer overflows have lost synchronization to 9 byte packets
-#     So we read in a large buffer of data and find which offset is the start
-#     of the packets
-K = 3 # This code works for 100 but not 1000. Maybe related to buffer size???
-MessageLen = 14
-x=ser.read(MessageLen*(K+1))
-assert(len(x) == MessageLen*(K+1))
-# print(x) # useful for debugging....
-# Find offset in this set
-index = 0
-while(True):
-    print(x[index:])
-    continueFlag = False
-    for k in range(K):
-        if ( x.index(b'E',index + k*MessageLen) - (k*MessageLen + index)) != 0:
-            continueFlag = True
-    if continueFlag:
-        index = index + 1
-    else:
-        break
-    if (index > (MessageLen-1)):
-        print('Reached end with bad index')
-        assert(False)
-        break
+class SerialInterface():
+    def __init__(self, SerialPort='/dev/ttyS0'):
+        print('Connecting to serial/USB interface {} and synchronizing.'.format(SerialPort))
+        self.serial = serial.Serial(port=SerialPort,
+            baudrate = 256000,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=0.2
+        )
 
-print('Found index: {}'.format(index))
+        # Synchronize immediately after opening port!
 
-x = ser.read(index) # read the last little bit of the bad block
+        # We read in a large buffer of data and find which offset is the start of the packets
+        K = 3 # This code works for 100 but not 1000. Maybe related to buffer size???
+        self.MessageLen = 14
+        x=self.serial.read(self.MessageLen*(K+1))
+        assert(len(x) == self.MessageLen*(K+1))
+        # print(x) # useful for debugging....
+        # Find offset in this set
+        index = 0
+        while(True):
+            print(x[index:])
+            continueFlag = False
+            for k in range(K):
+                if ( x.index(b'E',index + k*self.MessageLen) - (k*self.MessageLen + index)) != 0:
+                    continueFlag = True
+            if continueFlag:
+                index = index + 1
+            else:
+                break
+            if (index > (self.MessageLen-1)):
+                print('Reached end with bad index')
+                assert(False)
+                break
 
-with open(filename, 'w', newline='') as out_file:
-    while(True):
-        x=ser.read(MessageLen)
-        last_ts = time.time()
-        assert(len(x)==MessageLen)
-        
+        print('Found index: {}'.format(index))
+
+        x = self.serial.read(index) # read the last little bit of the bad block, and we are in sync!
+
+
+    def read_data(self):
+        x=self.serial.read(self.MessageLen)
+        assert(len(x)==self.MessageLen)
         FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
         # print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
             # FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
-
         assert(FlagChar == b'E')
-        
-        # writer.writerow([MasterTime, GPIO, last_ts])
+        return FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO
+
+    def send_byte(self,data):
+        if data is not None:
+            self.serial.write(data)
+
+
+
+
+with open(filename, 'w', newline='') as log_file:
+    writer = csv.writer(log_file)
+    Interface = SerialInterface(SerialPort=args.serial_port)
+    while(True):
+        last_ts = time.time()
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+        writer.writerow([MasterTime, GPIO, last_ts])
 
         if (MasterTime % 1000) == 0:
             print('Heartbeat {} : 0x{:08b} '.format(MasterTime, GPIO))
@@ -202,10 +217,7 @@ with open(filename, 'w', newline='') as out_file:
         IsRightWellPoked = (GPIO & Well.RightPokeMask) == Well.RightPokeMask
 
         if (IsLeftWellPoked and IsRightWellPoked):
-            print(x)
-            print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
-            FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
-            print('GPIO: 0x{:08b}'.format(GPIO))
+            print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format(FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
             raise Exception('Error: both Nose Pokes Activated')
 
         if CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight):
@@ -233,11 +245,15 @@ with open(filename, 'w', newline='') as out_file:
                         CurrentPokeState = PokeSubstates.PreDispenseToneDelay
                     elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
                         if IsLeftWellPoked:
-                            Well.LeftDispense()
+                            Interface.send_byte(Well.LeftDispenseMask)
                         elif IsRightWellPoked:
-                            Well.RightDispense()
+                            Interface.send_byte(Well.RightDispenseMask)
                         else:
                             raise Exception('Error in dispense state configuration.')
+                        DelayEnd = MasterTime + PostDispenseDelay
+                        CurrentPokeState = PokeSubstates.PostDispenseDelay
+                    elif CurrentPokeState == PokeSubstates.PostDispenseDelay:
+                        Interface.send_byte(b'\x00') # reset wells
                         DelayEnd = MasterTime + PostDispenseToneDelay
                         CurrentPokeState = PokeSubstates.PostDispenseToneDelay
                     elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
