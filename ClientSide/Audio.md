@@ -9,17 +9,27 @@ This has been tested on an updated Ubuntu 18.04 installation on the desktop and 
 ***Remember:*** If stuff is weird on the laptop it may be because anaconda has
 stolen our path!!!
 
-#### Install ubuntu studio control
-install - ubuntustudio-controls jack-tools ubuntustudio-performance-tweaks
+#### Install jack
+`sudo apt install libjack-jackd2-dev jack-tools`
+
+# (optional) Install ubuntu studio control
+ubuntustudio-controls ubuntustudio-performance-tweaks
 
 #### jackminimix
-liblo-tools liblo-dev libjack-jackd2-dev autotools-dev, autoconf
+[https://github.com/njh/jackminimix/]
+
+liblo-tools liblo-dev autotools-dev autoconf automake
 
 Note that there's a 'GAIN_FADE_RATE` value which is defined as 400 db/minute.
 This gives nice transitions, but extends sounds a bit.
 
 #### jackmeter
 Useful to see stuff working
+
+#### sndfile-jackplay
+[https://github.com/erikd/sndfile-tools/]
+
+libtool libsndfile1-dev libsamplerate0-dev libfftw3-dev libcairo2-dev
 
 #### GPIO
 

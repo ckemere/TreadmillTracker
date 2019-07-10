@@ -1,2 +1,5 @@
+# Give group-level access to the FT230X
+ACTION=="add", SUBSYSTEM=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", OWNER="user", MODE="0777", GROUP="dialout"
+
 # Lower the latency timer for the FTDI serial interface
 ACTION=="add", SUBSYSTEM=="usb-serial", DRIVER=="ftdi_sio", ATTR{latency_timer}="1"

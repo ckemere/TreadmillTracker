@@ -3,14 +3,24 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
-import mpld3
+#import mpld3
 
 #%%
-df = pd.read_csv('TestDev/Wheel and IO Data Log - 2019-06-26 1554.txt')
+df = pd.read_csv('Log2019-07-03 0051.txt', names=['MasterTime','GPIO','SysTS'])
 
 #%%
-EncoderData = df['Encoder']
 TimeStamps = df['MasterTime']
+SysTS = df['SysTS']
+
+diffTS = np.diff(SysTS)
+
+#%%
+sns.distplot(diffTS)
+
+#%%
+print(np.min(diffTS))
+print(np.max(diffTS))
+
 
 #%%
 mpld3.enable_notebook()

@@ -6,6 +6,9 @@ import serial
 import struct
 import argparse
 
+from oscpy.client import OSCClient
+
+
 ### Maybe should add argcomplete for this program?
 
 
@@ -33,50 +36,6 @@ if False:
 
 
 #%%
-ser = serial.Serial(port=args.serial_port,
- baudrate = 256000,
- parity=serial.PARITY_NONE,
- stopbits=serial.STOPBITS_ONE,
- bytesize=serial.EIGHTBITS,
- timeout=0.2
-)
-
-
-#%%
-print('Synchronizing')
-## Assume that buffer overflows have lost synchronization to 9 byte packets
-#     So we read in a large buffer of data and find which offset is the start
-#     of the packets
-K = 5 # This code works for 100 but not 1000. Maybe related to buffer size???
-MessageLen = 14
-x=ser.read(MessageLen*(K+1))
-assert(len(x) == MessageLen*(K+1))
-print(x)
-# Find offset in this set
-index = 0
-while(True):
-    print(x[index:])
-    continueFlag = False
-    for k in range(K):
-        if ( x.index(b'E',index + k*MessageLen) - (k*MessageLen + index)) != 0:
-            continueFlag = True
-    if continueFlag:
-        index = index + 1
-    else:
-        break
-    if (index > (MessageLen-1)):
-        print('Reached end with bad index')
-        assert(False)
-        break
-
-print('Found index: {}'.format(index))
-
-x = ser.read(index) # read the last little bit of the bad block
-print(x)
-
-#%%
-from oscpy.client import OSCClient
-oscC = OSCClient('127.0.0.1', args.osc_port)
 
 #%%
 import datetime
@@ -96,11 +55,9 @@ class MazeStates(Enum):
 class PokeSubstates(Enum):
     NotPoked = auto()
     BetweenDispensingDelay = auto()
-#    ToneOn = auto()
     PreDispenseToneDelay = auto()
-#    Dispense = auto()
+    PostDispenseDelay = auto()
     PostDispenseToneDelay = auto()
-#    ToneOff = auto()
 
 class SoundType(Enum):
     # Minimixer channels for each type of sound
@@ -110,152 +67,218 @@ class SoundType(Enum):
     Tone = 3
 
 class Sounds:
-    def __init__(self, whichSound=SoundType.NoSound):
-        self.is_playing = False
-        self.sound = whichSound
+    def __init__(self, WhichSound=SoundType.NoSound,
+            OnVolume=0.0, OffVolume=-1000.0,
+            OscPort=None):
+        self.sound = WhichSound
+        self.OnVolume = float(OnVolume)
+        self.OffVolume = float(OffVolume)
+        if OscPort is not None:
+            self.oscC = OSCClient('127.0.0.1', int(OscPort))
+        else:
+            self.oscC = OSCClient('127.0.0.1', 12345)
 
     def Play(self):
         if self.sound is not SoundType.NoSound:
-            if not self.is_playing:
-                print(self.sound)
-                oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), float(0.0)])
-                print('Playing ', self.sound.name)
-                self.is_playing = True
+            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume])
+            print('Playing ', self.sound.name)
 
     def Stop(self):
         if self.sound is not SoundType.NoSound:
-            if self.is_playing:
-                oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), float(-1000.0)])
-                print('Stopping ', self.sound.name)
-                self.is_playing = False
+            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
+            print('Stopping ', self.sound.name)
 
 
 #%%
-class Wells:
+class WellData:
     LeftPokeMask = 0x01
     RightPokeMask = 0x02
 
-    def LeftDispense(self):
-        print('Dispensing left well')
-    def RightDispense(self):
-        print('Dispensing right well')
+    LeftDispenseMask = b'\x40'
+    RightDispenseMask = b'\x80'
 
 #%%
-FirstBetweenDispensingDelay = 50
-PreDispenseToneDelay = 20
-PostDispenseToneDelay = 80
-SubsequentBetweenDispensingDelay = 500
+FirstBetweenDispensingDelay = 250
+PreDispenseToneDelay = 150
+PostDispenseDelay = 100
+PostDispenseToneDelay = 350
+SubsequentBetweenDispensingDelay = 1000
 
 # Initialization
 
 CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
-PinkNoiseStim = Sounds(SoundType.PinkNoise)
-ToneCloudStim = Sounds(SoundType.ToneCloud)
-ToneStim = Sounds(SoundType.Tone)
-
+PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
+ToneCloudStim = Sounds(SoundType.ToneCloud, OnVolume=-12.0, OffVolume=-1000.0, OscPort=args.osc_port)
+ToneStim = Sounds(SoundType.Tone, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
 
 #%%
 from subprocess import Popen, DEVNULL
 
-
 # Dispense on both ends to prime
-Well = Wells()
-Well.LeftDispense()
-Well.RightDispense()
+Well = WellData()
 
-with Popen(['/usr/local/bin/jackminimix', '-a', '-p', '12345'],
-        stdout=DEVNULL) as p_jackminimix:
-    time.sleep(1)
-    with Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
-            '-a=minimixer:in1_right', 'pink_noise.wav'], stdout=DEVNULL, stderr=DEVNULL) as p_pinknoise, \
-        Popen(['/usr/local/bin/sndfile-jackplay', '-l0', 
-            '-a=minimixer:in2_right', 'tone_cloud_no_gating.wav'], stdout=DEVNULL,
-            stderr=DEVNULL) as p_tone_cloud, \
-        open(filename, 'w', newline='') as log_file:
+# with open(filename, 'w', newline='') as log_file:
+    # writer = csv.writer(log_file)
 
-        writer = csv.writer(log_file)
-        print('Getting ready to start')
-        time.sleep(5)
-        PinkNoiseStim.Play()
-        ToneCloudStim.Stop()
+print('Getting ready to start')
+PinkNoiseStim.Stop()
+ToneCloudStim.Stop()
+ToneStim.Play()
+time.sleep(1)
+PinkNoiseStim.Stop()
+ToneStim.Stop()
+ToneCloudStim.Play()
+time.sleep(1)
+ToneCloudStim.Stop()
+ToneStim.Stop()
+PinkNoiseStim.Play()
 
-        CurrentPokeState = PokeSubstates.NotPoked
-        DelayEnd = 0
+CurrentPokeState = PokeSubstates.NotPoked
+DelayEnd = 0
 
-        print('Starting Master Loop')
+#%%
+################
+# With the serial data stream, because the rate of transfer is so high, the input buffer will
+# over flow quite rapidly. So the following chunk of code (which connects,  empties out the
+# buffer and gets things aligned on individual messages) needs to be run as closely as possible
+# to the actual start of data transfer!
+print('Connecting to serial/USB interface {} and synchronizing.'.format(args.serial_port))
+
+class SerialInterface():
+    def __init__(self, SerialPort='/dev/ttyS0'):
+        print('Connecting to serial/USB interface {} and synchronizing.'.format(SerialPort))
+        self.serial = serial.Serial(port=SerialPort,
+            baudrate = 256000,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=0.2
+        )
+
+        # Synchronize immediately after opening port!
+
+        # We read in a large buffer of data and find which offset is the start of the packets
+        K = 3 # This code works for 100 but not 1000. Maybe related to buffer size???
+        self.MessageLen = 14
+        x=self.serial.read(self.MessageLen*(K+1))
+        assert(len(x) == self.MessageLen*(K+1))
+        # print(x) # useful for debugging....
+        # Find offset in this set
+        index = 0
         while(True):
-            x=ser.read(MessageLen)
-            last_ts = time.time()
-            assert(len(x)==MessageLen)
-            FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
-            
-            writer.writerow([MasterTime, GPIO, last_ts])
+            print(x[index:])
+            continueFlag = False
+            for k in range(K):
+                if ( x.index(b'E',index + k*self.MessageLen) - (k*self.MessageLen + index)) != 0:
+                    continueFlag = True
+            if continueFlag:
+                index = index + 1
+            else:
+                break
+            if (index > (self.MessageLen-1)):
+                print('Reached end with bad index')
+                assert(False)
+                break
 
-            #print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
-            #    FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
+        print('Found index: {}'.format(index))
 
-            IsLeftWellPoked = (GPIO & Well.LeftPokeMask) > 0
-            IsRightWellPoked = (GPIO & Well.RightPokeMask) > 0
+        x = self.serial.read(index) # read the last little bit of the bad block, and we are in sync!
 
-            if (IsLeftWellPoked and IsRightWellPoked):
-                raise Exception('Error: both Nose Pokes Activated')
 
-            if CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight):
-                if not (IsLeftWellPoked or IsRightWellPoked): # Change in state
-                    print('Poked to not')
-                    ToneCloudStim.Stop()
-                    ToneStim.Stop()
-                    PinkNoiseStim.Play()
-                    DelayEnd = 0
-                    CurrentPokeState = PokeSubstates.NotPoked
-                    if CurrentMazeState == MazeStates.PokedLeft:
-                        ValidNextMazeState = MazeStates.PokedRight
-                        print('Next state right')
-                    elif CurrentMazeState == MazeStates.PokedRight:
-                        ValidNextMazeState = MazeStates.PokedLeft
-                        print('Next state left')
-                    CurrentMazeState = MazeStates.NotPoked
+    def read_data(self):
+        x=self.serial.read(self.MessageLen)
+        assert(len(x)==self.MessageLen)
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
+        # print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format( 
+            # FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
+        assert(FlagChar == b'E')
+        return FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO
 
-                    continue
-                else:
-                    if (MasterTime > DelayEnd): # Time for a state transition!
-                        if CurrentPokeState == PokeSubstates.BetweenDispensingDelay:
-                            ToneStim.Play()
-                            DelayEnd = MasterTime + PreDispenseToneDelay
-                            CurrentPokeState = PokeSubstates.PreDispenseToneDelay
-                        elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
-                            if IsLeftWellPoked:
-                                Well.LeftDispense()
-                            elif IsRightWellPoked:
-                                Well.RightDispense()
-                            else:
-                                raise Exception('Error in dispense state configuration.')
-                            DelayEnd = MasterTime + PostDispenseToneDelay
-                            CurrentPokeState = PokeSubstates.PostDispenseToneDelay
-                        elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
-                            ToneStim.Stop()
-                            DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
-                            CurrentPokeState = PokeSubstates.BetweenDispensingDelay
+    def send_byte(self,data):
+        if data is not None:
+            self.serial.write(data)
+
+
+
+
+with open(filename, 'w', newline='') as log_file:
+    writer = csv.writer(log_file)
+    Interface = SerialInterface(SerialPort=args.serial_port)
+    while(True):
+        last_ts = time.time()
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+        writer.writerow([MasterTime, GPIO, last_ts])
+
+        if (MasterTime % 1000) == 0:
+            print('Heartbeat {} : 0x{:08b} '.format(MasterTime, GPIO))
+
+        IsLeftWellPoked = (GPIO & Well.LeftPokeMask) == Well.LeftPokeMask
+        IsRightWellPoked = (GPIO & Well.RightPokeMask) == Well.RightPokeMask
+
+        if (IsLeftWellPoked and IsRightWellPoked):
+            print('Flag: {}. Clocks: {}. Encoder: {}. Unwrapped: {}, GPIO: 0x{:08b}'.format(FlagChar, MasterTime, Encoder, UnwrappedEncoder, GPIO))
+            raise Exception('Error: both Nose Pokes Activated')
+
+        if CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight):
+            if not (IsLeftWellPoked or IsRightWellPoked): # Change in state
+                print('Poked to not')
+                ToneCloudStim.Stop()
+                ToneStim.Stop()
+                PinkNoiseStim.Play()
+                DelayEnd = 0
+                CurrentPokeState = PokeSubstates.NotPoked
+                if CurrentMazeState == MazeStates.PokedLeft:
+                    ValidNextMazeState = MazeStates.PokedRight
+                    print('Next state right')
+                elif CurrentMazeState == MazeStates.PokedRight:
+                    ValidNextMazeState = MazeStates.PokedLeft
+                    print('Next state left')
+                CurrentMazeState = MazeStates.NotPoked
+
+                continue
+            else:
+                if (MasterTime > DelayEnd): # Time for a state transition!
+                    if CurrentPokeState == PokeSubstates.BetweenDispensingDelay:
+                        ToneStim.Play()
+                        DelayEnd = MasterTime + PreDispenseToneDelay
+                        CurrentPokeState = PokeSubstates.PreDispenseToneDelay
+                    elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
+                        if IsLeftWellPoked:
+                            Interface.send_byte(Well.LeftDispenseMask)
+                        elif IsRightWellPoked:
+                            Interface.send_byte(Well.RightDispenseMask)
                         else:
-                            raise Exception('Error in PokeSubstates state configuration.')
-
-
-            else: # NotPoked state
-                if IsLeftWellPoked or IsRightWellPoked: # Gone from Not Poked to PokedLeft or PokedRight
-                    if (ValidNextMazeState == MazeStates.PokedEither):
-                        CurrentMazeState = MazeStates.PokedLeft if IsLeftWellPoked else MazeStates.PokedRight
-                    elif IsLeftWellPoked and (ValidNextMazeState == MazeStates.PokedLeft):
-                        CurrentMazeState = MazeStates.PokedLeft
-                    elif IsRightWellPoked and (ValidNextMazeState == MazeStates.PokedRight):
-                        CurrentMazeState = MazeStates.PokedRight
+                            raise Exception('Error in dispense state configuration.')
+                        DelayEnd = MasterTime + PostDispenseDelay
+                        CurrentPokeState = PokeSubstates.PostDispenseDelay
+                    elif CurrentPokeState == PokeSubstates.PostDispenseDelay:
+                        Interface.send_byte(b'\x00') # reset wells
+                        DelayEnd = MasterTime + PostDispenseToneDelay
+                        CurrentPokeState = PokeSubstates.PostDispenseToneDelay
+                    elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
+                        ToneStim.Stop()
+                        DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
+                        CurrentPokeState = PokeSubstates.BetweenDispensingDelay
                     else:
-                        continue # The animal tried to poke again in a non-rewarding well
-                    print('Not to poked')
-                    ValidNextMazeState = MazeStates.NotPoked
-                    PinkNoiseStim.Stop()
-                    ToneCloudStim.Play()
-                    CurrentPokeState = PokeSubstates.BetweenDispensingDelay
-                    DelayEnd = MasterTime + FirstBetweenDispensingDelay
+                        raise Exception('Error in PokeSubstates state configuration.')
+
+
+        else: # NotPoked state
+            if IsLeftWellPoked or IsRightWellPoked: # Gone from Not Poked to PokedLeft or PokedRight
+                if (ValidNextMazeState == MazeStates.PokedEither):
+                    CurrentMazeState = MazeStates.PokedLeft if IsLeftWellPoked else MazeStates.PokedRight
+                elif IsLeftWellPoked and (ValidNextMazeState == MazeStates.PokedLeft):
+                    CurrentMazeState = MazeStates.PokedLeft
+                elif IsRightWellPoked and (ValidNextMazeState == MazeStates.PokedRight):
+                    CurrentMazeState = MazeStates.PokedRight
                 else:
-                    pass # Still not poked!
+                    continue # The animal tried to poke again in a non-rewarding well
+                print('Not to poked')
+                ValidNextMazeState = MazeStates.NotPoked
+                PinkNoiseStim.Stop()
+                ToneCloudStim.Play()
+                CurrentPokeState = PokeSubstates.BetweenDispensingDelay
+                DelayEnd = MasterTime + FirstBetweenDispensingDelay
+            else:
+                pass # Still not poked!
