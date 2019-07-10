@@ -17,23 +17,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// NOTE: see README.md for more details about code structure
 
+// Include custom code
 #include "quadrature.h"
 #include "uart.h"
 #include "TreadmillDataStruct.h"
 
-
+// Include libraries
 #include <msp430.h>
 #include <stdint.h>
 
-#define LED_POUT P1OUT
-#define LED_PDIR P1DIR
+// Define LED connectivity
+#define LED_POUT P1OUT // LED output signal = port 1
+#define LED_PDIR P1DIR // LED I/O direction = port 1
 #define PWR_LED 0x20 // Pin 2.0
 #define STATUS_LED 0x10 // Pin 2.1
 
-volatile uint16_t MasterClockHigh = 0;
+volatile uint16_t MasterClockHigh = 0; // upper 16 bits of 32-bit clock
 
-TreadmillDataStruct TreadmillData;
+TreadmillDataStruct TreadmillData; // 
 unsigned char *pTreadmillData;
 
 
@@ -43,6 +46,8 @@ void SendData()
     //   sure that if there's a conflict between timing
     //   or quadrature measurements and data x-mission,
     //   timing/quadrature wins.
+    // This structure ensures that the data copied to 
+    // pTreadmillData is not changing while being written.
 
     // Copy current clock and encoder data atomically.
     __disable_interrupt();
@@ -124,7 +129,7 @@ int main(void)
     } 
 }
 
-
+// Increment time register by 2 ms
 // Timer A0 CCR0 interrupt service routine => Wake up every 100 ms
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
 //#pragma vector=TIMER0_A0_VECTOR
@@ -140,7 +145,7 @@ void __attribute__((interrupt(TIMER0_A0_VECTOR))) WakeupClockISR (void)
   :[TIMERREG] "=m" (TA0CCR0) );
 }
 
-
+// Handle overflows in LOW register every 2^16 = 65536 ms by incrementing HIGH register
 // Timer A0 overflow interrupt service routine => increment higher 16bit counter
 //   Assumes TimerA0 is set up for 1 ms, continuous mode.
 //#pragma vector=TIMER0_A1_VECTOR
