@@ -5,6 +5,8 @@ import time
 import argparse
 from subprocess import Popen, DEVNULL
 
+AUDIO_DIR = '../../Audio/Stimuli/'
+
 ### Maybe should add argcomplete for this program?
 
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
@@ -17,7 +19,7 @@ args = parser.parse_args()
 jack_cmd = ['/usr/bin/jackd', '--realtime', '-P10','-d', 'alsa', '-p128', '-n2', '-r96000']
 minimix_cmd  = ['/usr/local/bin/jackminimix', '-a', '-p', '12345']
 def jackplay_cmd(channel, filename):
-    return ['/usr/local/bin/sndfile-jackplay', '-l0', '-a=minimixer:{}'.format(channel), '{}'.format(filename)]
+    return ['/usr/local/bin/sndfile-jackplay', '-l0', '-a=minimixer:{}'.format(channel), '{}{}'.format(AUDIO_DIR, filename)]
 
 with Popen(jack_cmd) as p_jack:
     time.sleep(0.5)
