@@ -5,13 +5,16 @@ import time
 import serial
 import struct
 import argparse
-
+import json
+from shutil import copy
 from oscpy.client import OSCClient
-
 
 ### Maybe should add argcomplete for this program?
 
+# GPIO IDs on Hat
+GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, None]
 
+# Command-line arguments: computer settings
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
 parser.add_argument('-P', '--serial-port', default='/dev/ttyS0',
                    help='TTY device for USB-serial interface (e.g., /dev/ttyUSB0 or COM10)')
@@ -19,10 +22,43 @@ parser.add_argument('-O', '--osc-port', type=int, default=12345,
                    help='Serial port for OSC client')
 parser.add_argument('--prefix', default='Data Log - ',
                    help='Prefix for output file - defaults to [Data Log - ]')
-
+parser.add_argument('--param-file', default='params.json',
+                    help='JSON file containing task parameters')
+parser.add_argument('--output-dir', default='./',
+                    help='Directory to write output file (defaults to cwd)')
 args = parser.parse_args()
-
+if not args.output_dir.endswith('/'):
+    args.output_dir += '/'
 print(args)
+
+# JSON parameters: task settings
+with json.loads(open(args.param_file).read()) as d:
+    # Sound timing
+    FirstBetweenDispensingDelay = d['Delay']['FirstBetweenDispensingDelay']
+    PreDispenseToneDelay = d['Delay']['PreDispenseToneDelay']
+    PostDispenseDelay = d['Delay']['PostDispenseDelay']
+    PostDispenseToneDelay = d['Delay']['PostDispenseToneDelay']
+    SubsequentBetweenDispensingDelay = d['Delay']['SubsequentBetweenDispensingDelay']
+
+    # Sound settings ([on_volume, off_volume])
+    PinkNoiseOn = d['Sound']['PinkNoise']
+    PinkNoiseOff = d['Sound']['PinkNoise']
+    ToneCloudOn = d['Sound']['ToneCloud']
+    ToneCloudOff = d['Sound']['ToneCloud']
+    ToneOn = d['Sound']['ToneOn']
+    ToneOff = d['Sound']['ToneOff']
+
+    # GPIO configuration
+    LeftPokeGPIO = d['GPIO']['LeftPoke']
+    RightPokeGPIO = d['GPIO']['LeftPoke']
+    LeftLickGPIO = d['GPIO']['LeftLick']
+    RightLickGPIO = d['GPIO']['RightLick']
+    LeftDispenseGPIO = d['GPIO']['LeftDispense']
+    RightDispenseGPIO = d['GPIO']['RightDispense']
+
+# Save session parameters to output directory
+new_fp = args.output_dir + 'params_' + now.strftime("%Y-%m-%d_%H%M")
+copy(param_file, new_fp)
 
 #%%
 if False:
@@ -91,26 +127,23 @@ class Sounds:
 
 #%%
 class WellData:
-    LeftPokeMask = 0x01
-    RightPokeMask = 0x02
-
-    LeftDispenseMask = b'\x40'
-    RightDispenseMask = b'\x80'
+    LeftPokeMask = 2**(GPIO_IDs.index(LeftPokeGPIO))
+    RightPokeMask = 2**(GPIO_IDs.index(RightPokeGPIO))
+    LeftLickMask = 2**(GPIO_IDs.index(LeftLickGPIO))
+    RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
+    LeftDispenseMask = 2**(GPIO_IDs.index(LeftDispenseGPIO))
+    RightDispenseMask = 2**(GPIO_IDs.index(RightDispenseGPIO))
 
 #%%
-FirstBetweenDispensingDelay = 250
-PreDispenseToneDelay = 150
-PostDispenseDelay = 100
-PostDispenseToneDelay = 350
-SubsequentBetweenDispensingDelay = 1000
+
 
 # Initialization
 
 CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
-PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
-ToneCloudStim = Sounds(SoundType.ToneCloud, OnVolume=-12.0, OffVolume=-1000.0, OscPort=args.osc_port)
-ToneStim = Sounds(SoundType.Tone, OnVolume=0.0, OffVolume=-1000.0, OscPort=args.osc_port)
+PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=PinkNoiseOn, OffVolume=PinkNoiseOff, OscPort=args.osc_port)
+ToneCloudStim = Sounds(SoundType.ToneCloud, OnVolume=ToneCloudOn, OffVolume=ToneCloudOff, OscPort=args.osc_port)
+ToneStim = Sounds(SoundType.Tone, OnVolume=ToneOn, OffVolume=ToneOff, OscPort=args.osc_port)
 
 #%%
 from subprocess import Popen, DEVNULL
