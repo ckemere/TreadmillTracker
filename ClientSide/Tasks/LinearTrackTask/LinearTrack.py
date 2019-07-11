@@ -4,6 +4,7 @@
 import time
 import serial
 import struct
+import os
 import argparse
 import json
 import datetime
@@ -29,8 +30,8 @@ parser.add_argument('--param-file', default='defaults.json',
 parser.add_argument('--output-dir', default='./',
                     help='Directory to write output file (defaults to cwd)')
 args = parser.parse_args()
-if not os.isdir(args.output_dir):
-    os.makedir(args.output_dir)
+if not os.path.isdir(args.output_dir):
+    os.mkdir(args.output_dir)
 if not args.output_dir.endswith('/'):
     args.output_dir += '/'
 print(args)
@@ -58,7 +59,7 @@ with open(args.param_file) as f:
 
     # GPIO configuration
     LeftPokeGPIO = d['GPIO']['LeftPoke']
-    RightPokeGPIO = d['GPIO']['LeftPoke']
+    RightPokeGPIO = d['GPIO']['RightPoke']
     LeftLickGPIO = d['GPIO']['LeftLick']
     RightLickGPIO = d['GPIO']['RightLick']
     LeftDispenseGPIO = d['GPIO']['LeftDispense']
@@ -134,12 +135,15 @@ class Sounds:
 
 #%%
 class WellData:
+    # State logic: store as integer type
     LeftPokeMask = 2**(GPIO_IDs.index(LeftPokeGPIO))
     RightPokeMask = 2**(GPIO_IDs.index(RightPokeGPIO))
-    LeftLickMask = 2**(GPIO_IDs.index(LeftLickGPIO))
-    RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
-    LeftDispenseMask = 2**(GPIO_IDs.index(LeftDispenseGPIO))
-    RightDispenseMask = 2**(GPIO_IDs.index(RightDispenseGPIO))
+    #LeftLickMask = 2**(GPIO_IDs.index(LeftLickGPIO))
+    #RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
+
+    # Serial data: store as binary string
+    LeftDispenseMask = chr(2**(GPIO_IDs.index(LeftDispenseGPIO))).encode()
+    RightDispenseMask = chr(2**(GPIO_IDs.index(RightDispenseGPIO))).encode()
 
 #%%
 
@@ -285,8 +289,10 @@ with open(filename, 'w', newline='') as log_file:
                         CurrentPokeState = PokeSubstates.PreDispenseToneDelay
                     elif CurrentPokeState == PokeSubstates.PreDispenseToneDelay:
                         if IsLeftWellPoked:
+                            print("sending byte", Well.LeftDispenseMask)
                             Interface.send_byte(Well.LeftDispenseMask)
                         elif IsRightWellPoked:
+                            print("sending byte", Well.RightDispenseMask)
                             Interface.send_byte(Well.RightDispenseMask)
                         else:
                             raise Exception('Error in dispense state configuration.')
