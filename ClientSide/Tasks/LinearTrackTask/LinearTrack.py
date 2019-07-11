@@ -6,13 +6,15 @@ import serial
 import struct
 import argparse
 import json
+import datetime
 from shutil import copy
+
 from oscpy.client import OSCClient
 
 ### Maybe should add argcomplete for this program?
 
 # GPIO IDs on Hat
-GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, None]
+GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, -1]
 
 # Command-line arguments: computer settings
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
@@ -22,17 +24,23 @@ parser.add_argument('-O', '--osc-port', type=int, default=12345,
                    help='Serial port for OSC client')
 parser.add_argument('--prefix', default='Data Log - ',
                    help='Prefix for output file - defaults to [Data Log - ]')
-parser.add_argument('--param-file', default='params.json',
+parser.add_argument('--param-file', default='defaults.json',
                     help='JSON file containing task parameters')
 parser.add_argument('--output-dir', default='./',
                     help='Directory to write output file (defaults to cwd)')
 args = parser.parse_args()
+if not os.isdir(args.output_dir):
+    os.makedir(args.output_dir)
 if not args.output_dir.endswith('/'):
     args.output_dir += '/'
 print(args)
 
+now = datetime.datetime.now()
+
 # JSON parameters: task settings
-with json.loads(open(args.param_file).read()) as d:
+with open(args.param_file) as f:
+    d = json.loads(f.read())
+
     # Sound timing
     FirstBetweenDispensingDelay = d['Delay']['FirstBetweenDispensingDelay']
     PreDispenseToneDelay = d['Delay']['PreDispenseToneDelay']
@@ -41,12 +49,12 @@ with json.loads(open(args.param_file).read()) as d:
     SubsequentBetweenDispensingDelay = d['Delay']['SubsequentBetweenDispensingDelay']
 
     # Sound settings ([on_volume, off_volume])
-    PinkNoiseOn = d['Sound']['PinkNoise']
-    PinkNoiseOff = d['Sound']['PinkNoise']
-    ToneCloudOn = d['Sound']['ToneCloud']
-    ToneCloudOff = d['Sound']['ToneCloud']
-    ToneOn = d['Sound']['ToneOn']
-    ToneOff = d['Sound']['ToneOff']
+    PinkNoiseOn = d['Sound']['PinkNoise']['OnVolume']
+    PinkNoiseOff = d['Sound']['PinkNoise']['OffVolume']
+    ToneCloudOn = d['Sound']['ToneCloud']['OnVolume']
+    ToneCloudOff = d['Sound']['ToneCloud']['OffVolume']
+    ToneOn = d['Sound']['Tone']['OnVolume']
+    ToneOff = d['Sound']['Tone']['OffVolume']
 
     # GPIO configuration
     LeftPokeGPIO = d['GPIO']['LeftPoke']
@@ -58,7 +66,7 @@ with json.loads(open(args.param_file).read()) as d:
 
 # Save session parameters to output directory
 new_fp = args.output_dir + 'params_' + now.strftime("%Y-%m-%d_%H%M")
-copy(param_file, new_fp)
+copy(args.param_file, new_fp)
 
 #%%
 if False:
@@ -74,9 +82,8 @@ if False:
 #%%
 
 #%%
-import datetime
 import csv
-now = datetime.datetime.now()
+
 filename = '{}{}.txt'.format('Log', now.strftime("%Y-%m-%d %H%M"))
 
 #%%
