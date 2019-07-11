@@ -257,7 +257,7 @@ class SerialInterface():
 
 
 
-with open(filename, 'w', newline='') as log_file:
+with open(args.output_dir + filename, 'w', newline='') as log_file:
     writer = csv.writer(log_file)
     Interface = SerialInterface(SerialPort=args.serial_port)
     while(True):
