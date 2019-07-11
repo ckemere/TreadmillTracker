@@ -12,13 +12,23 @@ stolen our path!!!
 #### Install jack
 `sudo apt install libjack-jackd2-dev jack-tools`
 
-# (optional) Install ubuntu studio control
+### (optional) Install ubuntu studio control
 ubuntustudio-controls ubuntustudio-performance-tweaks
 
 #### jackminimix
 [https://github.com/njh/jackminimix/]
 
-liblo-tools liblo-dev autotools-dev autoconf automake
+```
+# Install required packages
+sudo apt install liblo-tools liblo-dev autotools-dev autoconf automake
+
+# Install jackminimix
+git clone https://github.com/njh/jackminimix.git
+cd jackminimix
+./autogen.sh
+make
+make install
+```
 
 Note that there's a 'GAIN_FADE_RATE` value which is defined as 400 db/minute.
 This gives nice transitions, but extends sounds a bit.
@@ -29,7 +39,18 @@ Useful to see stuff working
 #### sndfile-jackplay
 [https://github.com/erikd/sndfile-tools/]
 
-libtool libsndfile1-dev libsamplerate0-dev libfftw3-dev libcairo2-dev
+```
+# Install required packages
+sudo apt install libtool libsndfile1-dev libsamplerate0-dev libfftw3-dev libcairo2-dev
+
+# Install sndfile-tools
+git clone https://github.com/erikd/sndfile-tools.git
+./autogen.sh
+./configure
+make
+make install
+```
+
 
 #### GPIO
 
@@ -94,6 +115,22 @@ the `cmdline.txt` file. See [README.md].
           sound buffers worth of latency. (Note that with `-p64`, each buffer is
           *1.3 ms* long, so with `n2`, that means a minimum of 2.6 ms of
           latency. I guess the minimixer 
+
+#### Running audio in background
+Optional arguments can vary. See above for details.
+
+```
+# Start jack daemon
+jackd --realtime -P 10 -d alsa -p 128 -n 2 -r 96000
+
+# Start jackminimix on port 12345
+jackminimix -a -p 12345
+
+# Play sounds in different channels continuously
+sndfile-jackplay -l0 -a=minimixer:in1_right pink_noise.wav
+sndfile-jackplay -l0 -a=minimixer:in2_right tone_cloud.wav
+sndfile-jackplay -l0 -a=minimixer:in3_right tone.wav
+```
 
 ### OSC commands
 
