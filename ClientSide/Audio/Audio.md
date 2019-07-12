@@ -10,7 +10,15 @@ This has been tested on an updated Ubuntu 18.04 installation on the desktop and 
 stolen our path!!!
 
 #### Install jack
-`sudo apt install libjack-jackd2-dev jack-tools`
+Install the jack daemon and tools. In order to get realtime priority, you'll also need
+to be a member of the audio group. (*You'll likely need to reboot for the group addition
+to take effect.*)
+
+```
+sudo apt install libjack-jackd2-dev jack-tools
+sudo usermod -a -G audio <your-username>
+```
+
 
 ### (optional) Install ubuntu studio control
 ubuntustudio-controls ubuntustudio-performance-tweaks
