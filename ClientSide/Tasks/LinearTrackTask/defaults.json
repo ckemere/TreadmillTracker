@@ -1,4 +1,8 @@
 {
+    "Info": {
+        "MouseID": ""
+    },
+
     "Delay": {
         "FirstBetweenDispensingDelay": 250,
         "PreDispenseToneDelay": 150,
