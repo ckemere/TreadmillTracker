@@ -2,6 +2,17 @@
 
 ### Using the direct USB interface
 
+#### Set up
+Install the udev file in /etc/udev/rules.d directory. This file sets up the proper permissions
+for the FT230X interface as well as the latency (see below). Also, add yourself to the proper
+groups.
+
+```
+sudo cp 60-ftdi-latency.rules /etc/udev/rules.d/
+sudo usermod -a -G tty <your-username>
+sudo usermod -a -G dialout <your-username>
+```
+
 #### Expectations
 We are sending 9 byte messages at 256000 baud. Since there is an extra stop byte per serial
 transaction, our messages are actually 9 x 9 or 81 bits long, and so our sustained rate can at

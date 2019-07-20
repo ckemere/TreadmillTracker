@@ -1,0 +1,39 @@
+{
+    "Info": {
+        "MouseID": ""
+    },
+
+    "Delay": {
+        "FirstBetweenDispensingDelay": 250,
+        "PreDispenseToneDelay": 150,
+        "PostDispenseDelay": 100,
+        "PostDispenseToneDelay": 350,
+        "SubsequentBetweenDispensingDelay": 1000
+    },
+
+    "Sound": {
+        "PinkNoise": {
+            "OnVolume": 0.0,
+            "OffVolume": -1000.0
+        },
+
+        "ToneCloud": {
+            "OnVolume": -12.0,
+            "OffVolume": -1000.0
+        },
+
+        "Tone": {
+            "OnVolume": 0.0,
+            "OffVolume": -1000.0
+        }
+    },
+
+    "GPIO": {
+        "LeftPoke": 16,
+        "RightPoke": 17,
+        "LeftLick": -1,
+        "RightLick": -1,
+        "LeftDispense": 26,
+        "RightDispense": 27
+    }
+}
