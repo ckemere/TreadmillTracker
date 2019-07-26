@@ -1,6 +1,7 @@
 {
     "Info": {
-        "MouseID": ""
+        "MouseID": "",
+        "Task": ""
     },
 
     "Delay": {
@@ -8,7 +9,9 @@
         "PreDispenseToneDelay": 150,
         "PostDispenseDelay": 100,
         "PostDispenseToneDelay": 350,
-        "SubsequentBetweenDispensingDelay": 1000
+        "SubsequentBetweenDispensingDelay": 1000,
+        "PokeEntryDelay": 500,
+        "PokeExitDelay": 500
     },
 
     "Sound": {
