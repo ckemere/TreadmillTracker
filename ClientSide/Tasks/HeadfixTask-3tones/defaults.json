@@ -1,0 +1,47 @@
+{
+    "Info": {
+        "MouseID": "F16",
+        "TaskType": "3tones-states",
+        "Date":"7-26-19",
+        "Session": "2"
+    },
+
+    "Delay": {
+        "LickTimeout": 6000.0,
+        "PostDispenseDelay": 100
+    },
+
+    "Sound": {
+        "PinkNoise": {
+            "OnVolume": 0.0,
+            "OffVolume": -1000.0
+        },
+
+        "ToneCloud": {
+            "OnVolume": -12.0,
+            "OffVolume": -1000.0
+        },
+
+        "Tone1": {
+            "OnVolume": 0.0,
+            "OffVolume": -1000.0
+        },
+        "Tone2": {
+            "OnVolume": 5.0,
+            "OffVolume": -1000.0
+        },
+        "Tone3": {
+            "OnVolume": 10.0,
+            "OffVolume": -1000.0
+        }
+    },
+
+    "GPIO": {
+        "LeftPoke": -1,
+        "RightPoke": -1,
+        "LeftLick": 16,
+        "RightLick": -1,
+        "LeftDispense": 27,
+        "RightDispense": -1
+    }
+}
