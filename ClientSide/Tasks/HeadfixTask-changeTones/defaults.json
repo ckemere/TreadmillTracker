@@ -1,13 +1,13 @@
 {
     "Info": {
         "MouseID": "F16",
-        "TaskType": "tone",
-        "Date":"",
-        "Session": "test"
+        "TaskType": "3tones-statesd",
+        "Date":"8-2-19",
+        "Session": ""
     },
 
     "Delay": {
-        "LickTimeout": 6000.0,
+        "LickTimeout": 4000.0,
         "PostDispenseDelay": 100
     },
 
@@ -22,8 +22,16 @@
             "OffVolume": -1000.0
         },
 
-        "Tone": {
-            "OnVolume": 0.0,
+        "Tone1": {
+            "peakVolume": 1.0,
+            "OffVolume": -1000.0
+        },
+        "Tone2": {
+            "peakVolume": 4.0,
+            "OffVolume": -1000.0
+        },
+        "Tone3": {
+            "peakVolume": 7.0,
             "OffVolume": -1000.0
         }
     },

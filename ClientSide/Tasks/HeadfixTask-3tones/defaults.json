@@ -2,12 +2,12 @@
     "Info": {
         "MouseID": "F16",
         "TaskType": "3tones-states",
-        "Date":"7-26-19",
-        "Session": "2"
+        "Date":"8-1-19",
+        "Session": "1"
     },
 
     "Delay": {
-        "LickTimeout": 6000.0,
+        "LickTimeout": 4000.0,
         "PostDispenseDelay": 100
     },
 
@@ -27,11 +27,11 @@
             "OffVolume": -1000.0
         },
         "Tone2": {
-            "OnVolume": 5.0,
+            "OnVolume": 4.0,
             "OffVolume": -1000.0
         },
         "Tone3": {
-            "OnVolume": 10.0,
+            "OnVolume": 8.0,
             "OffVolume": -1000.0
         }
     },
