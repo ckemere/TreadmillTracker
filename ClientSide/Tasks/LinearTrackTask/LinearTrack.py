@@ -146,8 +146,8 @@ class WellData:
     #RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
 
     # Serial data: store as binary string
-    LeftDispenseMask = chr(2**(GPIO_IDs.index(LeftDispenseGPIO))).encode()
-    RightDispenseMask = chr(2**(GPIO_IDs.index(RightDispenseGPIO))).encode()
+    LeftDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(LeftDispenseGPIO)))
+    RightDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(RightDispenseGPIO)))
 
 #%%
 
