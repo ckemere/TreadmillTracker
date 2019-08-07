@@ -12,9 +12,9 @@ AUDIO_DIR = '../../Audio/Stimuli/'
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
 parser.add_argument('-O', '--osc-port', type=int, default=12345, 
                    help='Serial port for OSC client')
-
+parser.add_argument('-s', '--side', type=str, default='right', choices=['left', 'right'],
+                    help='output side of mixer (left or right)')
 args = parser.parse_args()
-
 
 jack_cmd = ['/usr/bin/jackd', '--realtime', '-P10','-d', 'alsa', '-p128', '-n2', '-r96000']
 minimix_cmd  = ['/usr/local/bin/jackminimix', '-a', '-p', '12345']
@@ -25,9 +25,9 @@ with Popen(jack_cmd) as p_jack:
     time.sleep(0.5)
     with Popen(minimix_cmd, stdout=DEVNULL) as p_jackminimix:
         time.sleep(0.25)
-        with Popen(jackplay_cmd('in1_right', 'pink_noise.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_pinknoise, \
-            Popen(jackplay_cmd('in2_right', 'tone_cloud_gating.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_tone_cloud, \
-            Popen(jackplay_cmd('in3_right', 'tone.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_toned:
+        with Popen(jackplay_cmd('in1_{}'.format(args.side), 'pink_noise.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_pinknoise, \
+            Popen(jackplay_cmd('in2_{}'.format(args.side), 'tone_cloud_gating.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_tone_cloud, \
+            Popen(jackplay_cmd('in3_{}'.format(args.side), 'tone.wav'), stdout=DEVNULL, stderr=DEVNULL) as p_toned:
 
                 print('Started')
                 while True:
