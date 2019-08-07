@@ -7,7 +7,7 @@ import struct
 
 
 #%%
-ser = serial.Serial(port='COM6',
+ser = serial.Serial(port='/dev/ttyUSB0',
  baudrate = 256000,
  # baudrate = 9600,
  parity=serial.PARITY_NONE,
@@ -23,7 +23,7 @@ print('Synchronizing')
 #     So we read in a large buffer of data and find which offset is the start
 #     of the packets
 K = 1 # This code works for 100 but not 1000. Maybe related to buffer size???
-MessageLen = 9
+MessageLen = 14
 x=ser.read(MessageLen*(K+1)) # read K+1 messages
 assert(len(x) == MessageLen*(K+1)) # ensure K+1 messages received
 
@@ -66,7 +66,7 @@ with open('IntereventDataLatency.txt', 'w') as out_file:
       x=ser.read(MessageLen) # read one message
       if (len(x) == MessageLen):
           last_ts = time.time()
-          FlagChar, MasterTime, Encoder, GPIO  = struct.unpack('>cLhBx', x)
+          FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
           if FirstTSCaptured:
             #assert((MasterTime - lastMasterTime) == 2)
             out_file.write('{}\n'.format(last_ts - lastSystemTime))
