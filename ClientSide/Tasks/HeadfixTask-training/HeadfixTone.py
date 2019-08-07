@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 #%%
-# NOTE: 
+# NOTE: v1.1. One tone is introduced based on animal's location. Same tone present for all 3 sound zones.
+#       This version is not state machine based.
 
 import time
 import serial
