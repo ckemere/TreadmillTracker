@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 
 #%%
-# NOTE: 
+# NOTE: v1.0  Initial acclimation, and introducing to lick spout. Pink noise play in the background when mouse is headfixed. 
+#       No tones is presented. Whenever the mouse choose to lick the lick spout, water will be 
+#       dispensed automatically, with a LickTimeout (usually 4s) period between each time the
+#       mouse gets water reward.
 
 import time
 import serial

@@ -1,8 +1,8 @@
 {
     "Info": {
         "MouseID": "F16",
-        "TaskType": "3tones-statesd",
-        "Date":"8-2-19",
+        "TaskType": "3tones-change",
+        "Date":"",
         "Session": ""
     },
 
@@ -27,11 +27,11 @@
             "OffVolume": -1000.0
         },
         "Tone2": {
-            "peakVolume": 4.0,
+            "peakVolume": 1.0,
             "OffVolume": -1000.0
         },
         "Tone3": {
-            "peakVolume": 7.0,
+            "peakVolume": 1.0,
             "OffVolume": -1000.0
         }
     },
