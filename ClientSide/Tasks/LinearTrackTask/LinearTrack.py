@@ -14,34 +14,6 @@ from enum import Enum, auto, unique
 from subprocess import Popen, DEVNULL
 from Interface import SerialInterface, Sounds
 
-# Define logic classes
-class MazeStates(Enum):
-    NotPoked = auto()
-    PokedLeft = auto()
-    PokedRight = auto()
-    PokedEither = auto()
-
-@unique
-class PokeSubstates(Enum):
-    NotPoked = auto() # task logic state
-    Exiting = auto() # sensor state (for smoothing)
-    Entering = auto() # sensor state (for smoothing)
-    BetweenDispensingDelay = auto()
-    PreDispenseToneDelay = auto()
-    PostDispenseDelay = auto()
-    PostDispenseToneDelay = auto()
-
-class WellData:
-    # State logic: store as integer type
-    LeftPokeMask = 2**(GPIO_IDs.index(LeftPokeGPIO))
-    RightPokeMask = 2**(GPIO_IDs.index(RightPokeGPIO))
-    LeftLickMask = 2**(GPIO_IDs.index(LeftLickGPIO))
-    RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
-
-    # Serial data: store as binary string
-    LeftDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(LeftDispenseGPIO)))
-    RightDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(RightDispenseGPIO)))
-
 # Command-line arguments: computer settings
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
 parser.add_argument('-P', '--serial-port', default='/dev/ttyS0',
@@ -66,7 +38,7 @@ with open(args.param_file) as f:
 
     # General info
     mouseID = d['Info']['MouseID']
-    sessionID = d['Info']['SessionID']
+    sessionID = d['Info']['Session']
     GPIO_IDs = d['Info']['GPIO_IDs'] # GPIO IDs on Hat
     if not (GPIO_IDs[-1] == -1):
         # Add [-1] at end to avoid using unused GPIO logic
@@ -102,26 +74,37 @@ with open(args.param_file) as f:
 # Save session parameters and set up data logging
 dateString = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
 newFilename = '{}_d{}_{}_params.json'.format(mouseID, sessionID, dateString)
-newFilepath = args.output_dir + new_fn
+newFilepath = args.output_dir + newFilename
 copy(args.param_file, newFilepath)
 logFilename = '{}_d{}_{}_log.txt'.format(mouseID, sessionID, dateString)
 
-# Initialize sounds
-PinkNoiseStim = Sounds(Name=PinkNoiseParams['Name'], 
-                       Channel=PinkNoiseParams['Channel'], 
-                       OnVolume=PinkNoiseParams['OnVolume'], 
-                       OffVolume=PinkNoiseParams['OffVolume'], 
-                       OscPort=args.osc_port)
-ToneCloudStim = Sounds(Name=ToneCloudParams['Name'], 
-                       Channel=ToneCloudParams['Channel'], 
-                       OnVolume=ToneCloudParams['OnVolume'], 
-                       OffVolume=ToneCloudParams['OffVolume'], 
-                       OscPort=args.osc_port)
-ToneStim      = Sounds(Name=ToneParams['Name'], 
-                       Channel=ToneParams['Channel'], 
-                       OnVolume=ToneParams['OnVolume'], 
-                       OffVolume=ToneParams['OffVolume'], 
-                       OscPort=args.osc_port)
+# Define logic classes
+class MazeStates(Enum):
+    NotPoked = auto()
+    PokedLeft = auto()
+    PokedRight = auto()
+    PokedEither = auto()
+
+@unique
+class PokeSubstates(Enum):
+    NotPoked = auto() # task logic state
+    Exiting = auto() # sensor state (for smoothing)
+    Entering = auto() # sensor state (for smoothing)
+    BetweenDispensingDelay = auto()
+    PreDispenseToneDelay = auto()
+    PostDispenseDelay = auto()
+    PostDispenseToneDelay = auto()
+
+class WellData:
+    # State logic: store as integer type
+    LeftPokeMask = 2**(GPIO_IDs.index(LeftPokeGPIO))
+    RightPokeMask = 2**(GPIO_IDs.index(RightPokeGPIO))
+    LeftLickMask = 2**(GPIO_IDs.index(LeftLickGPIO))
+    RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
+
+    # Serial data: store as binary string
+    LeftDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(LeftDispenseGPIO)))
+    RightDispenseMask = struct.pack('<B', 2**(GPIO_IDs.index(RightDispenseGPIO)))
 
 # Initialize behavior logic
 Well = WellData()
@@ -135,6 +118,23 @@ RewardNumber = 0
 n = np.arange(int(tau*r_0/R_0))
 tReward = -tau*np.log(1.0 - (n*R_0)/(tau*r_0)) * 1000 # ms
 tDelay = np.append(np.diff(tReward), np.inf)
+
+# Initialize sounds
+PinkNoiseStim = Sounds(Name='PinkNoise', 
+                       Channel=PinkNoiseParams['Channel'], 
+                       OnVolume=PinkNoiseParams['OnVolume'], 
+                       OffVolume=PinkNoiseParams['OffVolume'], 
+                       OscPort=args.osc_port)
+ToneCloudStim = Sounds(Name='ToneCloud', 
+                       Channel=ToneCloudParams['Channel'], 
+                       OnVolume=ToneCloudParams['OnVolume'], 
+                       OffVolume=ToneCloudParams['OffVolume'], 
+                       OscPort=args.osc_port)
+ToneStim      = Sounds(Name='Tone', 
+                       Channel=ToneParams['Channel'], 
+                       OnVolume=ToneParams['OnVolume'], 
+                       OffVolume=ToneParams['OffVolume'], 
+                       OscPort=args.osc_port)
 
 # Play sounds
 print('Getting ready to start')

@@ -78,9 +78,9 @@ class Sounds:
     def Play(self):
         if self.channel != 0:
             self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.channel), self.OnVolume])
-            print('Playing ', self.name)
+            print('Playing', self.name)
 
     def Stop(self):
         if self.channel != 0:
             self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.channel), self.OffVolume])
-            print('Stopping ', self.name)
+            print('Stopping', self.name)
