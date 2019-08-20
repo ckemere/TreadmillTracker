@@ -9,13 +9,14 @@ import argparse
 import json
 import datetime
 from shutil import copy
+import numpy as np
 
 from oscpy.client import OSCClient
 
 ### Maybe should add argcomplete for this program?
 
 # GPIO IDs on Hat
-GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, -1]
+GPIO_IDs = [16, 17, 22, 23, 24, 25, 26, 27, -1]
 
 # Command-line arguments: computer settings
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
@@ -166,7 +167,7 @@ ToneStim = Sounds(SoundType.Tone, OnVolume=ToneOn, OffVolume=ToneOff, OscPort=ar
 
 # Set reward times
 n = np.arange(int(tau*r_0/R_0))
-tReward = -tau*np.log(1.0 - (n*R_0)/(tau*r_0))
+tReward = -tau*np.log(1.0 - (n*R_0)/(tau*r_0)) * 1000 # ms
 tDelay = np.append(np.diff(tReward), np.inf)
 
 #%%
