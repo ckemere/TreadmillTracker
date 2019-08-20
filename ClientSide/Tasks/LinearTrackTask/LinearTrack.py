@@ -67,6 +67,11 @@ with open(args.param_file) as f:
     LeftDispenseGPIO = d['GPIO']['LeftDispense']
     RightDispenseGPIO = d['GPIO']['RightDispense']
 
+    # Reward decay
+    tau = d['Reward']['tau']
+    r_0 = d['Reward']['r_0']
+    R_0 = d['Reward']['R_0']
+
 # Save session parameters to output directory
 new_fp = args.output_dir + 'params_' + now.strftime("%Y-%m-%d_%H%M")
 copy(args.param_file, new_fp)
@@ -153,12 +158,16 @@ class WellData:
 
 
 # Initialization
-
 CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
 PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=PinkNoiseOn, OffVolume=PinkNoiseOff, OscPort=args.osc_port)
 ToneCloudStim = Sounds(SoundType.ToneCloud, OnVolume=ToneCloudOn, OffVolume=ToneCloudOff, OscPort=args.osc_port)
 ToneStim = Sounds(SoundType.Tone, OnVolume=ToneOn, OffVolume=ToneOff, OscPort=args.osc_port)
+
+# Set reward times
+n = np.arange(int(tau*r_0/R_0))
+tReward = -tau*np.log(1.0 - (n*R_0)/(tau*r_0))
+tDelay = np.append(np.diff(tReward), np.inf)
 
 #%%
 from subprocess import Popen, DEVNULL
@@ -186,6 +195,7 @@ CurrentPokeState = PokeSubstates.NotPoked
 DelayEnd = 0
 LastEnterTime = 0
 LastExitTime = 0
+RewardNumber = 0
 
 #%%
 ################
@@ -258,7 +268,8 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
     while(True):
         last_ts = time.time()
         FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
-        writer.writerow([MasterTime, GPIO, last_ts])
+        isPoked = int(CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight))
+        writer.writerow([MasterTime, last_ts, GPIO, isPoked])
 
         if (MasterTime % 1000) == 0:
             print('Heartbeat {} : 0x{:08b} '.format(MasterTime, GPIO))
@@ -285,6 +296,7 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
                     ToneStim.Stop()
                     PinkNoiseStim.Play()
                     DelayEnd = 0
+                    RewardNumber = 0
                     CurrentPokeState = PokeSubstates.NotPoked
                     if CurrentMazeState == MazeStates.PokedLeft:
                         ValidNextMazeState = MazeStates.PokedRight
@@ -324,7 +336,8 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
                     CurrentPokeState = PokeSubstates.PostDispenseToneDelay
                 elif CurrentPokeState == PokeSubstates.PostDispenseToneDelay:
                     ToneStim.Stop()
-                    DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
+                    DelayEnd = MasterTime + tDelay[RewardNumber]
+                    RewardNumber += 1
                     CurrentPokeState = PokeSubstates.BetweenDispensingDelay
                 else:
                     raise Exception('Error in PokeSubstates state configuration.')
