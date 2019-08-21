@@ -73,10 +73,10 @@ with open(args.param_file) as f:
 
 # Save session parameters and set up data logging
 dateString = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
-newFilename = '{}_d{}_{}_params.json'.format(mouseID, sessionID, dateString)
+newFilename = '{}_d{:02d}_{}_params.json'.format(mouseID, sessionID, dateString)
 newFilepath = args.output_dir + newFilename
 copy(args.param_file, newFilepath)
-logFilename = '{}_d{}_{}_log.txt'.format(mouseID, sessionID, dateString)
+logFilename = '{}_d{:02d}_{}_log.txt'.format(mouseID, sessionID, dateString)
 
 # Define logic classes
 class MazeStates(Enum):
