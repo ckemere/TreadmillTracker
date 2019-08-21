@@ -112,8 +112,7 @@ CurrentMazeState = MazeStates.NotPoked
 ValidNextMazeState = MazeStates.PokedEither 
 CurrentPokeState = PokeSubstates.NotPoked
 DelayEnd = 0
-LastEnterTime = 0
-LastExitTime = 0
+ReentryState = [PokeSubstates.NotPoked, DelayEnd]
 RewardNumber = 0
 n = np.arange(int(tau*r_0/R_0))
 tReward = -tau*np.log(1.0 - (n*R_0)/(tau*r_0)) * 1000 # ms
@@ -181,6 +180,7 @@ with open(args.output_dir + logFilename, 'w', newline='') as log_file:
                 # Change poke state and set timer until NotPoked
                 if CurrentPokeState != PokeSubstates.Exiting: 
                     ToneStim.Stop()
+                    ReentryState = (CurrentPokeState, DelayEnd) # cache re-entry state
                     CurrentPokeState = PokeSubstates.Exiting
                     DelayEnd = MasterTime + PokeExitDelay
                 # Change from poked to not if delay surpasssed
@@ -204,8 +204,7 @@ with open(args.output_dir + logFilename, 'w', newline='') as log_file:
 
             # Reset to post-dispense state if re-entered before delay
             elif CurrentPokeState == PokeSubstates.Exiting:
-                DelayEnd = MasterTime + SubsequentBetweenDispensingDelay
-                CurrentPokeState = PokeSubstates.BetweenDispensingDelay
+                CurrentPokeState, DelayEnd = ReentryState
             
             # Check for transition to new substate
             elif (MasterTime > DelayEnd): # Time for a state transition!
