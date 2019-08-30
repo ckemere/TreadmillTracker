@@ -90,6 +90,7 @@ class Sounds:
 
 class Camera:
 
+    # See https://askubuntu.com/a/469125
     RECORD_CMD = ['killall', '--signal=USR1', 'guvcview']
 
     def __init__(self,
@@ -126,22 +127,28 @@ class Camera:
                          #'&>', '/dev/null'] # suppress annoying readouts
 
     def start(self):
+        # Start guvcview with specified parameters
         self._subprocess = subprocess.Popen(self.guvc_cmd)
         print('Starting guvcview...')
         time.sleep(5.0) # allow time for guvcview to start
 
+        # Send record signal to guvcview
         self._record()
     
     def _record(self):
+        # Signal guvcview to start recording video
         subprocess.call(self.RECORD_CMD)
 
     def stop(self):
+        # Send SIGINT to guvcview
         self._subprocess.send_signal(signal.SIGINT)
 
     def __enter__(self):
+        # Begin recording video upon instantiation
         self.start()
         return self
 
     def __exit__(self, type, value, traceback):
+        # Stop recording video upon exit
         self.stop()
         return True
