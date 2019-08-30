@@ -32,7 +32,7 @@
         },
 
         "Tone": {
-            "OnVolume": 0.0,
+            "OnVolume": -15.0,
             "OffVolume": -1000.0,
             "Filename": "tone.wav",
             "Channel": 3
