@@ -39,6 +39,13 @@
         }
     },
 
+    "Camera": {
+        "fps": 30,
+        "Resolution": [1920, 1080],
+        "Codec": "h264",
+        "Audio": "none"
+    },
+
     "GPIO": {
         "LeftPoke": 16,
         "RightPoke": 17,

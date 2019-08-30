@@ -12,7 +12,7 @@ import numpy as np
 import csv
 from enum import Enum, auto, unique
 from subprocess import Popen, DEVNULL
-from Interface import SerialInterface, Sounds
+from Interface import SerialInterface, Sounds, Camera
 
 # Command-line arguments: computer settings
 parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
@@ -71,12 +71,19 @@ with open(args.param_file) as f:
     r_0 = d['Reward']['r_0']
     R_0 = d['Reward']['R_0']
 
+    # Camera settings
+    camParams = {'fps': d['Camera']['fps'],
+                 'resolution': d['Camera']['Resolution'],
+                 'codec': d['Camera']['Codec'],
+                 'audio': d['Camera']['Audio']}
+
 # Save session parameters and set up data logging
 dateString = datetime.datetime.now().strftime("%Y-%m-%d-%H%M")
 newFilename = '{}_d{:02d}_{}_params.json'.format(mouseID, sessionID, dateString)
 newFilepath = args.output_dir + newFilename
 copy(args.param_file, newFilepath)
 logFilename = '{}_d{:02d}_{}_log.txt'.format(mouseID, sessionID, dateString)
+camFilename = '{}_d{:02d}_{}_cam'.format(mouseID, sessionID, dateString)
 
 # Define logic classes
 class MazeStates(Enum):
@@ -155,7 +162,8 @@ PinkNoiseStim.Play()
 # to the actual start of data transfer!
 print('Connecting to serial/USB interface {} and synchronizing.'.format(args.serial_port))
 
-with open(args.output_dir + logFilename, 'w', newline='') as log_file:
+with open(args.output_dir + logFilename, 'w', newline='') as log_file,\
+     Camera(args.output_dir + camFilename, **camParams) as cam:
     writer = csv.writer(log_file)
     Interface = SerialInterface(SerialPort=args.serial_port)
     while(True):

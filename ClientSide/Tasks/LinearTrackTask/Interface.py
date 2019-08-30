@@ -1,6 +1,9 @@
 import serial
 import struct
 from oscpy.client import OSCClient
+import subprocess
+import signal
+import time
 
 class SerialInterface():
     def __init__(self, SerialPort='/dev/ttyS0'):
@@ -84,3 +87,61 @@ class Sounds:
         if self.channel != 0:
             self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.channel), self.OffVolume])
             print('Stopping', self.name)
+
+class Camera:
+
+    RECORD_CMD = ['killall', '--signal=USR1', 'guvcview']
+
+    def __init__(self,
+                 filename,
+                 fps=30,
+                 resolution=[640, 480],
+                 codec='h264',
+                 audio='none'):
+        """
+        Creates an interface with a webcam via guvcview software.
+
+        Args:
+        - filename: Name (or filepath) of video file.
+        - fps: Frame rate (Hz)
+        - resolution: Video resolution to capture. 
+            Only standard options are available.
+        - codec: Video codec to use. Options include: raw, mjpg, mpeg, flv1, 
+            wmv1, mpg2, mp43, dx50, h264, vp80, theo
+        - audio: Audio API to use. Options include: none, port, pulse
+            (if enabled during build)
+        """
+        self.filename = filename
+        self.fps = fps
+        self.res = resolution
+        self.codec = codec
+        self.audio = audio
+        self.guvc_cmd = ['guvcview', 
+                         '--fps={}'.format(self.fps),
+                         '--resolution={}x{}'.format(self.res[0], self.res[1]),
+                         '--video_codec={}'.format(self.codec), 
+                         '--video={}'.format(self.filename),
+                         '--audio={}'.format(self.audio),
+                         '--exit_on_term']
+                         #'&>', '/dev/null'] # suppress annoying readouts
+
+    def start(self):
+        self._subprocess = subprocess.Popen(self.guvc_cmd)
+        print('Starting guvcview...')
+        time.sleep(5.0) # allow time for guvcview to start
+
+        self._record()
+    
+    def _record(self):
+        subprocess.call(self.RECORD_CMD)
+
+    def stop(self):
+        self._subprocess.send_signal(signal.SIGINT)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.stop()
+        return True
