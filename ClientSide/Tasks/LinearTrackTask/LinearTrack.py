@@ -167,7 +167,8 @@ with open(args.output_dir + logFilename, 'w', newline='') as log_file,\
     writer = csv.writer(log_file)
     Interface = SerialInterface(SerialPort=args.serial_port)
     while(True):
-        last_ts = time.time()
+        #last_ts = time.time() 
+        last_ts = time.monotonic()
         FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
         isPoked = int(CurrentMazeState in (MazeStates.PokedLeft, MazeStates.PokedRight))
         writer.writerow([MasterTime, last_ts, GPIO, isPoked])
