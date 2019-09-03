@@ -97,7 +97,8 @@ class Camera:
                  filename,
                  fps=30,
                  resolution=[640, 480],
-                 codec='h264',
+                 cam_format='H264',
+                 codec='raw',
                  audio='none'):
         """
         Creates an interface with a webcam via guvcview software.
@@ -107,19 +108,27 @@ class Camera:
         - fps: Frame rate (Hz)
         - resolution: Video resolution to capture. 
             Only standard options are available.
-        - codec: Video codec to use. Options include: raw, mjpg, mpeg, flv1, 
-            wmv1, mpg2, mp43, dx50, h264, vp80, theo
+        - cam_format: Camera output format. Must be FOURCC code 
+            (i.e. str of len 4).
+        - codec: Video codec to use. Note that this occurs *after* receiving the
+            camera output. That is, guvcview will receive video data in 
+            `cam_format` and then encode it by `codec` before writing to file. 
+            This can slow frame rate as the buffer overflows from encoding time. 
+            Options include: raw, mjpg, mpeg, flv1, wmv1, mpg2, mp43, dx50, h264, 
+            vp80, theo
         - audio: Audio API to use. Options include: none, port, pulse
             (if enabled during build)
         """
         self.filename = filename
         self.fps = fps
         self.res = resolution
+        self.cam_format = cam_format
         self.codec = codec
         self.audio = audio
         self.guvc_cmd = ['guvcview', 
                          '--fps={}'.format(self.fps),
                          '--resolution={}x{}'.format(self.res[0], self.res[1]),
+                         '--format={}'.format(self.cam_format),
                          '--video_codec={}'.format(self.codec), 
                          '--video={}'.format(self.filename),
                          '--audio={}'.format(self.audio),
