@@ -34,6 +34,7 @@ sudo apt install liblo-tools liblo-dev autotools-dev autoconf automake
 git clone https://github.com/njh/jackminimix.git
 cd jackminimix
 ./autogen.sh
+./configure
 make
 make install
 ```
@@ -53,10 +54,11 @@ sudo apt install libtool libsndfile1-dev libsamplerate0-dev libfftw3-dev libcair
 
 # Install sndfile-tools
 git clone https://github.com/erikd/sndfile-tools.git
+cd sndfile-tools
 ./autogen.sh
 ./configure
 make
-make install
+sudo make install
 ```
 
 
@@ -101,12 +103,12 @@ the `cmdline.txt` file. See [README.md].
           realtime, `-P` priority is 10, -v verbose, `-d` set alsa output device,
           `-p 64` set the buffer to be small and `-n 2` have a minimal number of
           buffers, and `-P hw:1,0` set the proper soundcard) We could also add
-          a `-r 192000` to set the sampling rate.
+          a `-r 192000` to set the sampling rate. Check for the proper soundcard by listing audio devices with `aplay -l`, and looking for the numbers associated with the desired sound card and device on it. (`hw:<#>,<#>` stands for *hardware: card_number, device_number*.)
 
        2. Start the minimixer: `jackminimix -a -p 12345` (optionally `-v` to
 	  see commands coming through.) Note that `12345` is the port for osc
           control. You can change it to something else, but make sure your other
-          code matches.
+          code matches. If you need to swap the input/output connections, run `jackminimix -l <input_ID> -r <input_ID> -p 12345`, where `<input_ID>` is the input to the left and right outputs of the mixer, respectively. (e.g. `system:playback_1`).
 
        3. Start an audio loop playing into the mixer: `./PlaySound/jplay -l0
           -a=minimixer:in1_right 15khz_sine.wav`
@@ -129,7 +131,7 @@ Optional arguments can vary. See above for details.
 
 ```
 # Start jack daemon
-jackd --realtime -P 10 -d alsa -p 128 -n 2 -r 96000
+jackd --realtime -P 10 -d alsa -p 128 -n 2 -r 96000 -P hw:0,0
 
 # Start jackminimix on port 12345
 jackminimix -a -p 12345
