@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 #%%
-# NOTE: v1.4. 3 different Tones (3kHz, 6kHz, 12kHz) are played based on animal's position on the virtual track. 
+# NOTE: v1.5. 3 different Tones (3kHz, 6kHz, 12kHz) are played based on animal's position on the virtual track. 
 #       ramping volume depend on a parameter named "peak_volume" describing how steep the ramping function
 #       should be (default 13). Taking care the max peakVolume or OnVolume should not exceed -90dB and 90dB.
+#       WHEN the mouse reach reward location first time each round, water is delivered automatically (not operant),
+#       then the consequent water are delivered in operant condition.
 
 import time
 import serial
@@ -29,7 +31,7 @@ parser.add_argument('-O', '--osc-port', type=int, default=12345,
                    help='Serial port for OSC client')
 parser.add_argument('--prefix', default='Data Log - ',
                    help='Prefix for output file - defaults to [Data Log - ]')
-parser.add_argument('--param-file', default='defaults.json',
+parser.add_argument('--param-file', default='training.json',   ####### changed default!
                     help='JSON file containing task parameters')
 parser.add_argument('--output-dir', default='./',
                     help='Directory to write output file (defaults to cwd)')
@@ -344,14 +346,25 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
                 currentMazeState = MazeStates.ToneZone2
             volume = distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance*3, ZoneDistance)
             ToneStim2.ChangePlay(volume)
-        elif ZoneDistance*4 < linear_pos % VirtualTrackDistance < ZoneDistance*4 +zonebuffer: #postzone 
+        elif ZoneDistance*4  < linear_pos % VirtualTrackDistance <= ZoneDistance*4 +zonebuffer/2:
+            ToneStim1.Stop()
+            ToneStim2.Stop()
+            ToneStim3.Stop()
+            PinkNoiseStim.Play()
+        elif ZoneDistance*4 + zonebuffer/2 < linear_pos % VirtualTrackDistance < ZoneDistance*4 +zonebuffer: #postzone 
             if (currentMazeState == MazeStates.ToneZone2 and currentZoneState == ZoneSubstates.BetweenZone):
-                ToneStim1.Stop()
-                ToneStim2.Stop()
-                ToneStim3.Stop()
                 PinkNoiseStim.Play()
                 currentZoneState = ZoneSubstates.PostZone
                 print('post tone zone 2, entering reward zone, silent 3')
+                if (MasterTime > DelayEnd):  
+                    print("sending byte", Well.LeftDispenseMask)
+                    Interface.send_byte(Well.LeftDispenseMask)
+                    DelayEnd = MasterTime + PostDispenseDelay    # wait till pump finish dispense
+            else:
+                PinkNoiseStim.Play()
+                if (MasterTime > DelayEnd): 
+                    Interface.send_byte(b'\x00') # reset wells
+                    DelayEnd = MasterTime + 1000  # 1sec lick time out
         elif ZoneDistance*4 +zonebuffer <= linear_pos % VirtualTrackDistance <= ZoneDistance*5 -zonebuffer: #reward zone
             if ZoneDistance*4 + SilentZoneDelay <= linear_pos % VirtualTrackDistance <= ZoneDistance*4 + SilentZoneDelay + ValidRewardZone:
                 if (MasterTime % 1000) == 0:
