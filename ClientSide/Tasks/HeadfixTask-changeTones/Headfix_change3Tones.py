@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 #%%
-# NOTE: v1.4. 3 different Tones (3kHz, 6kHz, 12kHz) are played based on animal's position on the virtual track. 
+# NOTE: v1.6.1 3 different Tones (3kHz, 6kHz, 12kHz) are played based on animal's position on the virtual track. 
 #       ramping volume depend on a parameter named "peak_volume" describing how steep the ramping function
 #       should be (default 13). Taking care the max peakVolume or OnVolume should not exceed -90dB and 90dB.
+#       Added max_reward_times, max number of reward in a single lap that the animal can get, even if it keep licking
+#       inside the reward zone
 
 import time
 import serial
@@ -75,6 +77,7 @@ with open(args.param_file) as f:
     SilentZoneDelay = d['Info']['SilentZoneDelay'] #cm, distance after tone ends, before rewards given
     ValidRewardZone = d['Info']['ValidRewardZone'] #cm, reward zone distance
     zonebuffer = d['Info']['zonebuffer']  #cm prezone and postzone buffer distance
+    max_reward_times = d['Info']['max_reward_times']  # number of reward the animal can get in one lap
 
 # Save session parameters to output directory
 new_fp = args.output_dir + 'params_' + now.strftime("%Y-%m-%d_%H%M")
@@ -283,7 +286,7 @@ class SerialInterface():
 #----------------------- parameters --------------
 d = 20.2 #cm diameter of the physical wheel; 150cm
 VirtualTrackDistance = ZoneDistance * 6 #cm
-
+count = 0
 #%%
 
 with open(args.output_dir + filename, 'w', newline='') as log_file:
@@ -360,9 +363,10 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
                 ## currenly he has to wait for LickTimeout amount of time (3s?) before he receives next water
                 IsLicked = (GPIO & Well.LeftLickMask) == Well.LeftLickMask
                 if CurrentLickState == MazeStates.NotLicked:
-                    if (MasterTime > DelayEnd and IsLicked): # Time for a state transition!
+                    if (MasterTime > DelayEnd and IsLicked and count < max_reward_times): # Time for a state transition!
                         print("sending byte", Well.LeftDispenseMask)
                         Interface.send_byte(Well.LeftDispenseMask)
+                        count += 1
                         DelayEnd = MasterTime + PostDispenseDelay    # wait till pump finish dispense
                         CurrentLickState = MazeStates.Licked
                 else:  # now mouse is licked, set a time out for mouse so he doesn't keep getting reward as he finish up drinking
@@ -379,6 +383,7 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
                 ToneStim2.Stop()
                 currentZoneState = ZoneSubstates.BetweenZone
                 print('post reward location, play tone 3')
+                count = 0
         elif ZoneDistance*5 <= linear_pos % VirtualTrackDistance <= ZoneDistance*6: #tone 3
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.BetweenZone):
                 currentMazeState = MazeStates.ToneZone3

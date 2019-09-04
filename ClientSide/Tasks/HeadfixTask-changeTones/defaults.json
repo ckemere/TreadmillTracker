@@ -1,14 +1,15 @@
 {
     "Info": {
-        "MouseID": "V1A1",
+        "MouseID": "F16",
         "TaskType": "3tones-change-operant",
-        "Date":"9-3-19",
+        "Date":"9-4-19",
         "Session": "1",
         "Note": "",
-        "ZoneDistance": 25,
+        "ZoneDistance": 15,
         "SilentZoneDelay": 3,
         "zonebuffer": 1,
-        "ValidRewardZone": 10        
+        "ValidRewardZone": 10,
+        "max_reward_times": 5        
     },
 
     "Delay": {
