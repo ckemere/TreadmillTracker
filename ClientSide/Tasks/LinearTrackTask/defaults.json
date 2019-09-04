@@ -42,7 +42,8 @@
     "Camera": {
         "fps": 30,
         "Resolution": [1920, 1080],
-        "Codec": "h264",
+        "Format": "H264",
+        "Codec": "raw",
         "Audio": "none"
     },
 
