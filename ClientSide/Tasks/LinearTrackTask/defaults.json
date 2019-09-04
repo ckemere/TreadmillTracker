@@ -59,5 +59,12 @@
         "tau": 10.0,
         "r_0": 1.0,
         "R_0": 2.0
+    },
+
+    "Data": {
+        "MasterTime": 0,
+        "ComputerTime": 1,
+        "GPIO": 2,
+        "Poked": 3
     }
 }
