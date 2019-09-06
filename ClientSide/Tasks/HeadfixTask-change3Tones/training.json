@@ -1,0 +1,53 @@
+{
+    "Info": {
+        "MouseID": "V1A1",
+        "TaskType": "3tones-change-classical",
+        "Date":"9-2-19",
+        "Session": "",
+        "Note": "",
+        "ZoneDistance": 25,
+        "SilentZoneDelay": 3,
+        "zonebuffer": 2,
+        "ValidRewardZone": 10,
+        "max_reward_times": 5          
+    },
+
+    "Delay": {
+        "LickTimeout": 3000.0,
+        "PostDispenseDelay": 100
+    },
+
+    "Sound": {
+        "PinkNoise": {
+            "OnVolume": 0.0,
+            "OffVolume": -1000.0
+        }, 
+
+        "ToneCloud": {
+            "OnVolume": -12.0,
+            "OffVolume": -1000.0
+        },
+
+        "Tone1": {
+            "peakVolume": 13.0,
+            "OffVolume": -1000.0
+        },
+        "Tone2": {
+            "peakVolume": 13.0,
+            "OffVolume": -1000.0
+        },
+        "Tone3": {
+            "peakVolume": 13.0,
+            "OffVolume": -1000.0
+        }
+    },
+
+    "GPIO": {
+        "LeftPoke": -1,
+        "RightPoke": -1,
+        "LeftLick": 16,
+        "RightLick": -1,
+        "LeftDispense": 27,
+        "RightDispense": -1
+    }
+}
