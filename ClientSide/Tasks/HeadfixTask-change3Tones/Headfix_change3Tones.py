@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 
 #%%
-# NOTE: v1.3 Tones (10kHz) will be loud/quiet as a function of the distance travelled for the mouse. 
+# NOTE: v2.1.1. 3 different Tones (3kHz, 6kHz, 12kHz) are played based on animal's position on the virtual track. 
 #       ramping volume depend on a parameter named "peak_volume" describing how steep the ramping function
-#       should be (default 13). 
+#       should be (default 13). Taking care the max peakVolume or OnVolume should not exceed -90dB and 90dB.
+# Features: 
+#     sound logic that is controlled only by linear_pos
+#     pump logic controlled by PumpOn and PumpOffTime, so each time the pump is triggered, it must reset after 100ms regardless of animal's pos
+#     peak_volume is constant number regardless of different tone frequencies
+#     max_reward_times controls the max number of reward it can get within one single lap
 
 import time
 import serial
@@ -29,7 +34,7 @@ parser.add_argument('-O', '--osc-port', type=int, default=12345,
                    help='Serial port for OSC client')
 parser.add_argument('--prefix', default='Data Log - ',
                    help='Prefix for output file - defaults to [Data Log - ]')
-parser.add_argument('--param-file', default='defaults.json',
+parser.add_argument('--param-file', default='defaults.json',   ####### changed default!
                     help='JSON file containing task parameters')
 parser.add_argument('--output-dir', default='./',
                     help='Directory to write output file (defaults to cwd)')
@@ -55,11 +60,11 @@ with open(args.param_file) as f:
     PinkNoiseOff = d['Sound']['PinkNoise']['OffVolume']
     ToneCloudOn = d['Sound']['ToneCloud']['OnVolume']
     ToneCloudOff = d['Sound']['ToneCloud']['OffVolume']
-    ToneOn1 = d['Sound']['Tone1']['peakVolume']
+    PeakTone1 = d['Sound']['Tone1']['peakVolume']
     ToneOff1 = d['Sound']['Tone1']['OffVolume']
-    ToneOn2 = d['Sound']['Tone2']['peakVolume']
+    PeakTone2 = d['Sound']['Tone2']['peakVolume']
     ToneOff2 = d['Sound']['Tone2']['OffVolume']
-    ToneOn3 = d['Sound']['Tone3']['peakVolume']
+    PeakTone3 = d['Sound']['Tone3']['peakVolume']
     ToneOff3 = d['Sound']['Tone3']['OffVolume']
 
     # GPIO configuration
@@ -69,6 +74,13 @@ with open(args.param_file) as f:
     RightLickGPIO = d['GPIO']['RightLick']
     LeftDispenseGPIO = d['GPIO']['LeftDispense']
     RightDispenseGPIO = d['GPIO']['RightDispense']
+
+    # Maze parameters
+    ZoneDistance = d['Info']['ZoneDistance'] #cm, both silent zone and tone zone
+    SilentZoneDelay = d['Info']['SilentZoneDelay'] #cm, distance after tone ends, before rewards given
+    ValidRewardZone = d['Info']['ValidRewardZone'] #cm, reward zone distance
+    zonebuffer = d['Info']['zonebuffer']  #cm prezone and postzone buffer distance
+    max_reward_times = d['Info']['max_reward_times']  # number of reward the animal can get in one lap
 
 # Save session parameters to output directory
 new_fp = args.output_dir + 'params_' + now.strftime("%Y-%m-%d_%H%M")
@@ -109,18 +121,17 @@ class SoundType(Enum):
     # Minimixer channels for each type of sound
     NoSound = 0
     PinkNoise = 1
-    ToneCloud = 2
-    Tone1 = 3
+    # ToneCloud = 2
+    Tone1 = 2
     Tone2 = 3
-    Tone3 = 3
+    Tone3 = 4
 
 class Sounds:
-    def __init__(self, WhichSound=SoundType.NoSound,
-            OnVolume=0.0, OffVolume=-1000.0, #peakVolume = 1.0,
-            OscPort=None):
+    def __init__(self, WhichSound=SoundType.NoSound, 
+            OffVolume=-1000.0, OscPort=None):
         self.sound = WhichSound
-        self.OnVolume = float(OnVolume)
         self.OffVolume = float(OffVolume)
+        self.CurrentVolume = float(OffVolume)
         # self.peakVolume = float(peakVolume)
      
         if OscPort is not None:
@@ -128,38 +139,44 @@ class Sounds:
         else:
             self.oscC = OSCClient('127.0.0.1', 12345)
 
-    def Play(self):
-        if self.sound is not SoundType.NoSound:
-            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume])
-            # print('Playing ', self.sound.name)
+        self.Stop()
 
     def Stop(self):
         if self.sound is not SoundType.NoSound:
-            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
-            # print('Stopping ', self.sound.name)
+            if (self.CurrentVolume != self.OffVolume):
+                self.CurrentVolume = self.OffVolume
+                self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
+                # print('Stopping ', self.sound.name)
 
     def ChangePlay(self, volume):
         if self.sound is not SoundType.NoSound:
-            self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume * volume])
-            # self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume * scale(distance)])
+            if( self.CurrentVolume != volume ):
+                if (volume == self.OffVolume):
+                    self.CurrentVolume = self.OffVolume
+                    self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OffVolume])
+                else:
+                    self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), volume])
+                    self.CurrentVolume = volume
+                # self.oscC.send_message(b'/mixer/channel/set_gain',[int(self.sound.value), self.OnVolume * scale(distance)])
 
 
-def distance_to_volume(distance, ZoneDistance):
+def distance_to_volume(distance, ZoneDistance, PeakVolume, OffVolume):
     """ input: linear_pos of the mouse running on the wheel, assume linear_pos = 0cm.
                change "peak_volume" to control the steepness of the volume scale function
         output: scaled up or down volume based on the distance. A triangle consist of y = d/(zonedistance/2)
                 and y = - 1/7.5 *d + 2; 1 = peak volume. 7.5 = zonedistance/2  
     """
-    peak_volume = 13
-
     if 0 <= distance  < ZoneDistance/2:
-        volume = lambda d: peak_volume * d / (ZoneDistance/2)
+        volume = lambda d: PeakVolume * d / (ZoneDistance/2)
+        return volume(distance)
     elif ZoneDistance/2 <= distance  <= ZoneDistance:
-        volume = lambda d: - peak_volume * d / (ZoneDistance/2) + 2 *peak_volume
+        volume = lambda d: - PeakVolume * d / (ZoneDistance/2) + 2*PeakVolume
+        return volume(distance)
     else:
-        print('return same volume scale ---')
-        return 1  # do not change the volume scale otherwise
-    return volume(distance)
+        # print('return same volume scale ---')
+        return OffVolume
+        #return 1  # do not change the volume scale otherwise
+    
 
 #%%
 class WellData:
@@ -168,7 +185,8 @@ class WellData:
     # RightLickMask = 2**(GPIO_IDs.index(RightLickGPIO))
 
     # Serial data: store as binary string
-    LeftDispenseMask = chr(2**(GPIO_IDs.index(LeftDispenseGPIO))).encode()
+    LeftDispenseMask = bytes([2**(GPIO_IDs.index(LeftDispenseGPIO))])
+    print(LeftDispenseMask)
     #RightDispenseMask = chr(2**(GPIO_IDs.index(RightDispenseGPIO))).encode()
 
 #%%
@@ -178,10 +196,10 @@ CurrentLickState = MazeStates.NotLicked
 currentMazeState = MazeStates.SilentZones
 currentZoneState = ZoneSubstates.PostZone
 
-PinkNoiseStim = Sounds(SoundType.PinkNoise, OnVolume=PinkNoiseOn, OffVolume=PinkNoiseOff, OscPort=args.osc_port)
-ToneStim1 = Sounds(SoundType.Tone1, OnVolume=ToneOn1, OffVolume=ToneOff1, OscPort=args.osc_port)
-ToneStim2 = Sounds(SoundType.Tone2, OnVolume=ToneOn2, OffVolume=ToneOff2, OscPort=args.osc_port)
-ToneStim3 = Sounds(SoundType.Tone3, OnVolume=ToneOn3, OffVolume=ToneOff3, OscPort=args.osc_port)
+PinkNoiseStim = Sounds(SoundType.PinkNoise, OffVolume=PinkNoiseOff, OscPort=args.osc_port)
+ToneStim1 = Sounds(SoundType.Tone1, OffVolume=ToneOff1, OscPort=args.osc_port)
+ToneStim2 = Sounds(SoundType.Tone2, OffVolume=ToneOff2, OscPort=args.osc_port)
+ToneStim3 = Sounds(SoundType.Tone3, OffVolume=ToneOff3, OscPort=args.osc_port)
 
 #%%
 from subprocess import Popen, DEVNULL
@@ -194,20 +212,20 @@ Well = WellData()
 
 print('Getting ready to start')
 PinkNoiseStim.Stop()
-ToneStim1.Play()
+ToneStim1.ChangePlay(PeakTone1)
 time.sleep(1)
 PinkNoiseStim.Stop()
 ToneStim1.Stop()
-ToneStim2.Play()
+ToneStim2.ChangePlay(PeakTone2)
 time.sleep(1)
 ToneStim1.Stop()
 ToneStim2.Stop()
-ToneStim3.Play()
+ToneStim3.ChangePlay(PeakTone3)
 time.sleep(1)
 ToneStim1.Stop()
 ToneStim2.Stop()
 ToneStim3.Stop()
-PinkNoiseStim.Play()
+PinkNoiseStim.ChangePlay(PinkNoiseOn)
 
 DelayEnd = 0
 
@@ -276,11 +294,8 @@ class SerialInterface():
 #%%
 #----------------------- parameters --------------
 d = 20.2 #cm diameter of the physical wheel; 150cm
-ZoneDistance = 15 #cm, both silent zone and tone zone
-SilentZoneDelay = 1 #cm, distance after tone ends, before rewards given
-ValidRewardZone = 10 #cm, reward zone distance
-VirtualTrackDistance = 90 #cm
-zonebuffer = 1 #cm prezone and postzone buffer distance
+VirtualTrackDistance = ZoneDistance * 6 #cm
+count = 0
 
 #%%
 
@@ -291,104 +306,117 @@ with open(args.output_dir + filename, 'w', newline='') as log_file:
     FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
     initialUnwrappedencoder = UnwrappedEncoder 
     print("initial unwrapped encoder value : ", UnwrappedEncoder)
+    Interface.send_byte(b'\x00') # reset wells
+    PumpOn = False
+
+    ### Initialize some delay flags to be something close to zero
+    PumpOffTime = MasterTime
+    DelayEnd = MasterTime
+
     ## every 2 ms happens:
     while(True):
-        last_ts = time.time()
+        # last_ts = time.time()
+        last_ts = time.monotonic()   # to match with miniscope timestamps (which is written in msec, here is sec)
         FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
         writer.writerow([MasterTime, GPIO, Encoder, UnwrappedEncoder, last_ts])
 
         if (MasterTime % 3000) == 0:
             print('Heartbeat {} : 0x{:08b} '.format(MasterTime, GPIO))
 
+        #######################################################################################
+        ### Logic to turn reward pump off if something happened
+        if ((PumpOn == True) and (MasterTime > PumpOffTime)):  #Pumpofftime = current time when the pump was on + how long to keep the pump on for
+            Interface.send_byte(b'\x00') # reset wells
+            PumpOn = False
+        #######################################################################################
+        # Get linear position
         linear_pos = (UnwrappedEncoder - initialUnwrappedencoder) * d /4096 * np.pi 
+
+        #######################################################################################
+        ### Logic of virtual reality sounds
+        volume1, volume2, volume3 = (distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance, ZoneDistance, PeakTone1, ToneOff1),
+                 distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance*3, ZoneDistance, PeakTone2, ToneOff2),
+                 distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance*5, ZoneDistance, PeakTone3, ToneOff3))
+        
+        ToneStim1.ChangePlay(volume1)
+        ToneStim2.ChangePlay(volume2)
+        ToneStim3.ChangePlay(volume3)
+
+        if (volume1 == ToneOff1) and (volume2 == ToneOff2) and (volume3 == ToneOff3):
+            PinkNoiseStim.ChangePlay(PinkNoiseOn)
+        else:
+            PinkNoiseStim.Stop()
+        #######################################################################################
+
         if ZoneDistance - zonebuffer < linear_pos % VirtualTrackDistance < ZoneDistance: #prezone
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.PostZone):
-                PinkNoiseStim.Stop()
-                ToneStim2.Stop()
-                ToneStim3.Stop()
-                # volume = distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance, ZoneDistance)
-                # ToneStim1.ChangePlay(volume)
                 currentZoneState = ZoneSubstates.BetweenZone
                 print('post silent zone 1, play tone 1')
+
         elif ZoneDistance <= linear_pos % VirtualTrackDistance <= ZoneDistance + ZoneDistance: #tone 1
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.BetweenZone):
                 currentMazeState = MazeStates.ToneZone1
-            volume = distance_to_volume(linear_pos % VirtualTrackDistance - ZoneDistance, ZoneDistance)
-            ToneStim1.ChangePlay(volume)
             # if (MasterTime % 500) == 0:  # check and update the volume based on position every 300 ms.
                 # volume = distance_to_volume(linear_pos % VirtualTrackDistance - ZoneDistance, ZoneDistance)
                 # print("update volume info, ", volume)
+
         elif ZoneDistance*2 < linear_pos % VirtualTrackDistance < ZoneDistance*2 +zonebuffer: #postzone 
             if (currentMazeState == MazeStates.ToneZone1 and currentZoneState == ZoneSubstates.BetweenZone):
-                ToneStim1.Stop()
-                ToneStim2.Stop()
-                ToneStim3.Stop()
-                PinkNoiseStim.Play()
                 currentZoneState = ZoneSubstates.PostZone
                 print('post tone zone 1, silent 2')
+
         elif ZoneDistance*2 +zonebuffer <= linear_pos % VirtualTrackDistance <= ZoneDistance*3 -zonebuffer: #silent 2
             if (currentMazeState == MazeStates.ToneZone1 and currentZoneState == ZoneSubstates.PostZone):
                 currentMazeState = MazeStates.SilentZones
+
         elif ZoneDistance*3 -zonebuffer < linear_pos % VirtualTrackDistance < ZoneDistance*3: #prezone 
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.PostZone):
-                PinkNoiseStim.Stop()
-                ToneStim1.Stop()
-                ToneStim3.Stop()
                 currentZoneState = ZoneSubstates.BetweenZone
                 print('post silent zone 2, play tone 2')
+
         elif ZoneDistance*3 <= linear_pos % VirtualTrackDistance <= ZoneDistance*4: #tone 2
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.BetweenZone):
                 currentMazeState = MazeStates.ToneZone2
-            volume = distance_to_volume(linear_pos % VirtualTrackDistance- ZoneDistance*3, ZoneDistance)
-            ToneStim2.ChangePlay(volume)
+            
         elif ZoneDistance*4 < linear_pos % VirtualTrackDistance < ZoneDistance*4 +zonebuffer: #postzone 
             if (currentMazeState == MazeStates.ToneZone2 and currentZoneState == ZoneSubstates.BetweenZone):
-                ToneStim1.Stop()
-                ToneStim2.Stop()
-                ToneStim3.Stop()
-                PinkNoiseStim.Play()
                 currentZoneState = ZoneSubstates.PostZone
-                print('post tone zone 2, entering reward zone, silent 3')
+                print('post tone zone 2, entering free reward zone, silent 3')
+                
         elif ZoneDistance*4 +zonebuffer <= linear_pos % VirtualTrackDistance <= ZoneDistance*5 -zonebuffer: #reward zone
+            if (currentMazeState == MazeStates.ToneZone2 and currentZoneState == ZoneSubstates.PostZone):
+                currentMazeState = MazeStates.SilentZones
+
             if ZoneDistance*4 + SilentZoneDelay <= linear_pos % VirtualTrackDistance <= ZoneDistance*4 + SilentZoneDelay + ValidRewardZone:
                 if (MasterTime % 1000) == 0:
-                    print('in REWARD zone...')
+                    print('in operant REWARD zone...')
                 ## operant condition, check if the mouse licked, if he did, then dispense water
                 ## currenly he has to wait for LickTimeout amount of time (3s?) before he receives next water
                 IsLicked = (GPIO & Well.LeftLickMask) == Well.LeftLickMask
                 if CurrentLickState == MazeStates.NotLicked:
-                    if (MasterTime > DelayEnd and IsLicked): # Time for a state transition!
+                    if (MasterTime > DelayEnd and IsLicked and count < max_reward_times): # Time for a state transition!
                         print("sending byte", Well.LeftDispenseMask)
                         Interface.send_byte(Well.LeftDispenseMask)
-                        DelayEnd = MasterTime + PostDispenseDelay    # wait till pump finish dispense
-                        CurrentLickState = MazeStates.Licked
-                else:  # now mouse is licked, set a time out for mouse so he doesn't keep getting reward as he finish up drinking
-                    if (MasterTime > DelayEnd):  # this delayend refers to syringe pump triggering
-                        Interface.send_byte(b'\x00') # reset wells
-                        DelayEnd = MasterTime + LickTimeout
-                        CurrentLickState = MazeStates.NotLicked
-            if (currentMazeState == MazeStates.ToneZone2 and currentZoneState == ZoneSubstates.PostZone):
-                currentMazeState = MazeStates.SilentZones
+                        PumpOffTime = MasterTime + PostDispenseDelay    # wait till pump finish dispense
+                        PumpOn = True
+                        count += 1
+                        DelayEnd = MasterTime + LickTimeout  # 1sec lick time out
+                
         elif ZoneDistance*5 -zonebuffer < linear_pos % VirtualTrackDistance < ZoneDistance*5: #prezone 
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.PostZone):
-                PinkNoiseStim.Stop()
-                ToneStim1.Stop()
-                ToneStim2.Stop()
                 currentZoneState = ZoneSubstates.BetweenZone
                 print('post reward location, play tone 3')
+                count = 0
+
         elif ZoneDistance*5 <= linear_pos % VirtualTrackDistance <= ZoneDistance*6: #tone 3
             if (currentMazeState == MazeStates.SilentZones and currentZoneState == ZoneSubstates.BetweenZone):
                 currentMazeState = MazeStates.ToneZone3
-            volume = distance_to_volume(linear_pos % VirtualTrackDistance - ZoneDistance*5, ZoneDistance)
-            ToneStim3.ChangePlay(volume)
+
         elif 0 < linear_pos % VirtualTrackDistance < zonebuffer: #postzone, beginning of silent zone 1
             if (currentMazeState == MazeStates.ToneZone3 and currentZoneState == ZoneSubstates.BetweenZone):
-                ToneStim1.Stop()
-                ToneStim2.Stop()
-                ToneStim3.Stop()
-                PinkNoiseStim.Play()
                 currentZoneState = ZoneSubstates.PostZone
                 print('post tone zone 3, silent 1')
+
         elif zonebuffer <= linear_pos % VirtualTrackDistance <= ZoneDistance -zonebuffer: #silent 1
             if (currentMazeState == MazeStates.ToneZone3 and currentZoneState == ZoneSubstates.PostZone):
                 currentMazeState = MazeStates.SilentZones
