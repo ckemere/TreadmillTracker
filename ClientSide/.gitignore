@@ -7,3 +7,4 @@
 cloud.cfg
 *.json
 !defaults.json
+!Audio/Stimuli/*.json
