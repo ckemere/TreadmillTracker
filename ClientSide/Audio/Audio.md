@@ -142,6 +142,41 @@ sndfile-jackplay -l0 -a=minimixer:in2_right tone_cloud.wav
 sndfile-jackplay -l0 -a=minimixer:in3_right tone.wav
 ```
 
+#### Some notes on JACK
+JACK creates virtual connections between audio sources and targets, typically for one device (e.g. sound card). We can specify which device JACK manages by adding the `-d` or `-P` flag *after* the `alsa` flag:
+
+```
+jackd --realtime -P 10 -d alsa -p 128 -n 2 -r 96000 -d hw:0,0
+```
+
+See notes above for determining the device name (one could also use the shorthand name found from the commmand `cat /proc/asound/cards` in the format `hw:<name>`). Once the device is found, JACK will then automatically create the appropriate virtual input and output ports that correspond to those on the device. For example, when specifying a Xonar DG sound card in the command above, JACK creates six output ports, one for each native output port in the sound card: front left, front right, side surround, center surround/subwoofer, S/PDIF digital output, and front panel. We can view this by opening the GUI QjackCtl (by simplying running `qjackctl` from the command line):
+
+![QjackCtl](./Images/qjackctl.png)
+
+and clicking the "Connect" button on the bottom left.
+
+![JACK output ports](./Images/output_only.png)
+
+As we can see, JACK has already recognized the six output ports on our Xonar DG sound card, and named them accordingly: `system:playback_x`, which is the default name for raw MIDI ports on the ALSA driver (as implemented [here](https://github.com/jackaudio/jack2/blob/master/linux/alsarawmidi/JackALSARawMidiPort.cpp#L48); likewise, input ports are assigned the names `system:capture_x` by default). Next, we fire up the minimixer from the command line, using the `-a` flag for auto-connection and allowing the default of four input channels (which can be specified with the `-c` flag): 
+
+```
+jackminimix -a -p 12345
+```
+
+and view the updated connections on QjackCtl:
+
+![Minimix and Jack](./Images/input_output.png)
+
+Because the JACK minimix is "JACK aware", it detected the running JACK server and automatically connected its output ports to the first two playback ports on the server. These correspond to "front left" and "front right" on our sound card. Note the minimix can set up any number of input channels (within limits), each of which contain a left and right side, but only one output channel with left and right sides; the actual output is determined by the sum of the inputs plus the MIDI commands for each input channel that determine its gain. We could achieve the same goal by specifying to which JACK playback ports the left and right minimix outputs connect:
+
+```
+jackminimix -l system:playback_1 -r system:playback_2 -p 12345
+```
+
+Finally, let's discuss how we route the sound to multiple outputs. We have two options:
+1. Create a stereo audio file with the desired number of outputs. Play the sound using `sndfile-jackplay` without specifying any ports (i.e. do not use the `-a` flag). This will route the stereo file appropriately so that the channels in the stereo file will align with the corresponding outputs. Make sure that the ALSA driver has Analog Output set to Stereo mode by using the `alsamixer` command.
+2. Feed mono audio files into the left or right channels of the minimixer using the flag `-a=minimixer:in<channel>_<side>`, where `channel` is the channel number and `side` is left or right. (If you get confused, simply refer to the writeable ports listed in QjackCtl.) The volume of each channel (but not left or right side individually) can be controlled by sending `osc` commands to the minimixer as detailed above. Unlike the first method, this method is limited the just two outputs (left and right). Make sure that the ALSA driver has Analog Output set to Multichannel mode. Also, check that the speaker balance is set appropriately so that one side isn't muted!
+
 ### OSC commands
 
 #### Python
