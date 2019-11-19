@@ -103,7 +103,7 @@ the `cmdline.txt` file. See [README.md].
           realtime, `-P` priority is 10, -v verbose, `-d` set alsa output device,
           `-p 64` set the buffer to be small and `-n 2` have a minimal number of
           buffers, and `-P hw:1,0` set the proper soundcard) We could also add
-          a `-r 192000` to set the sampling rate. Check for the proper soundcard by listing audio devices with `aplay -l`, and looking for the numbers associated with the desired sound card and device on it. (`hw:<#>,<#>` stands for *hardware: card_number, device_number*.)
+          a `-r 192000` to set the sampling rate. Check for the proper soundcard by listing audio devices with `aplay -l`, and looking for the numbers associated with the desired sound card and device on it. (`hw:<#>,<#>` stands for *hardware: card_number, device_number*.) See [here](https://www.mankier.com/1/jackd) for a nice list of available command-line parameters (including backends).
 
        2. Start the minimixer: `jackminimix -a -p 12345` (optionally `-v` to
 	  see commands coming through.) Note that `12345` is the port for osc
@@ -149,7 +149,7 @@ JACK creates virtual connections between audio sources and targets, typically fo
 jackd --realtime -P 10 -d alsa -p 128 -n 2 -r 96000 -d hw:0,0
 ```
 
-See notes above for determining the device name (one could also use the shorthand name found from the commmand `cat /proc/asound/cards` in the format `hw:<name>`). Once the device is found, JACK will then automatically create the appropriate virtual input and output ports that correspond to those on the device. For example, when specifying a Xonar DG sound card in the command above, JACK creates six output ports, one for each native output port in the sound card: front left, front right, side surround, center surround/subwoofer, S/PDIF digital output, and front panel. We can view this by opening the GUI QjackCtl (by simplying running `qjackctl` from the command line):
+See notes above for determining the device name (one could also use the shorthand name found from the commmand `cat /proc/asound/cards` in the format `hw:<name>`; see [here](https://jackaudio.org/faq/device_naming.html) or [here](https://superuser.com/a/53977) for more details.). Once the device is found, JACK will then automatically create the appropriate virtual input and output ports that correspond to those on the device. For example, when specifying a Xonar DG sound card in the command above, JACK creates six output ports, one for each native output port in the sound card: front left, front right, side surround, center surround/subwoofer, S/PDIF digital output, and front panel. We can view this by opening the GUI QjackCtl (by simplying running `qjackctl` from the command line):
 
 ![QjackCtl](./Images/qjackctl.png)
 
