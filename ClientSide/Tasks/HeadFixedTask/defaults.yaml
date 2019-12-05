@@ -1,0 +1,60 @@
+
+Info:
+  MouseID: V1A1
+  Note: ''
+  Session: ''
+  TaskType: 3tones-change-classical
+
+
+Preferences:
+  HeartBeat: 3000 # ms
+  AudioFileDirectory: '../../Audio/Stimuli'
+
+GPIO:
+  Dispense: 27
+  Lick: 16
+
+Maze:
+  EncoderGain: 4096.0 # encoder value per revolution
+  Length: 150.0 # cm
+  WheelDiameter: 20.2 # cm
+
+AuditoryStimuli:
+  Defaults:
+    Filename: '' # if no filename is specified, we'll raise an error later
+    Type: 'Localized'
+    CenterPosition: 0.0
+    BaselineGain: 0.0
+    Modulation:
+      Type: Linear
+      Outside: -1000.0 # dB outside range
+      #Rate: -20.0 # dB/cm
+      Width: 25 # cm in which sound is on (full width)
+
+  StimuliList:
+    BackgroundSound:
+      Type: 'Background'
+      BaselineGain: -10.0
+      Filename: 'PinkNoise.wav'
+      Color: 'pink'
+    Zone_1:
+      CenterPosition: 12.5 
+      Filename: 'Tone_3kHz.wav'
+      Color: 'lime'
+    Zone_2:
+      CenterPosition: 62.5 
+      Filename: 'Tone_3kHz.wav'
+      Color: 'red'
+    Zone_3:
+      CenterPosition: 112.5 
+      Filename: 'Tone_3kHz.wav'
+      Color: 'orange'
+
+RewardZone:
+  Type: 'Operant'
+  PumpRunTime: 100 # How long to run the reward pump for
+  LickTimeout: 3000.0 # Time between reward availability
+  MaxSequentialRewards: 5
+  RewardZoneStart: 130
+  RewardZoneWidth: 140
+
