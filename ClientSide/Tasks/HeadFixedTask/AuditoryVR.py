@@ -24,7 +24,7 @@ GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, -1]
 
 # Command-line arguments: computer settings
 
-# JSON parameters: task settings
+# YAML parameters: task settings
 with open('defaults.yaml', 'r') as f:
     Config = yaml.safe_load(f)
 
@@ -37,30 +37,64 @@ for stimulus_name, stimulus in StimuliList.items():
             stimulus[key] = Config['AuditoryStimuli']['Defaults'][key]
 
 
-
-#%%
-
-#%%
 #----------------------- parameters --------------
-VirtualTrackDistance = Config['Maze']['Length'] #cm
+VirtualTrackLength = Config['Maze']['Length'] #cm
 d = Config['Maze']['WheelDiameter'] #cm diameter of the physical wheel; 150cm
 count = 0
 
 
 #%%
 from RenderTrack import RenderTrack
-track = RenderTrack(d/2)
+
+visualization = RenderTrack(d/2)
+
+from SoundStimulus import SoundStimulus
+
+SoundStimuliList = []
 
 for stimulus_name, stimulus in StimuliList.items():
+
+    filename = stimulus['Filename']
+    if Config['Preferences']['AudioFileDirectory']:
+        filename = os.path.join(Config['Preferences']['AudioFileDirectory'], filename)
+    print('Loading: {}'.format(filename))
+    SoundStimuliList.append(SoundStimulus(filename=filename))
+
     if stimulus['Type'] == 'Background':
-        track.add_zone(0, 360, fillcolor=stimulus['Color'], width=0.5, alpha=0.75)
+        visualization.add_zone(0, np.pi*2, fillcolor=stimulus['Color'], width=0.5, alpha=0.75)
+        SoundStimuliList[-1].change_gain(stimulus['BaselineGain'])
+
     else:
-        theta1 = (stimulus['CenterPosition'] - stimulus['Modulation']['Width']/2) / VirtualTrackDistance * 360
-        theta2 = (stimulus['CenterPosition'] + stimulus['Modulation']['Width']/2) / VirtualTrackDistance * 360
-        track.add_zone(theta1, theta2, fillcolor=stimulus['Color'])
+        theta1 = (stimulus['CenterPosition'] - stimulus['Modulation']['Width']/2) / VirtualTrackLength * np.pi * 2
+        theta2 = (stimulus['CenterPosition'] + stimulus['Modulation']['Width']/2) / VirtualTrackLength * np.pi * 2
+        visualization.add_zone(theta1, theta2, fillcolor=stimulus['Color'])
+
+        SoundStimuliList[-1].initLocalizedSound(center=stimulus['CenterPosition'], 
+                        width=stimulus['Modulation']['Width'], trackLength=VirtualTrackLength, 
+                        maxGain=stimulus['BaselineGain'], minGain=stimulus['Modulation']['CutoffGain'])
+        SoundStimuliList[-1].change_gain(-90.0) # start off turned off
+
+    time.sleep(1.0)
 
 
-#%%
+from RewardZone import ClassicalRewardZone
+
+RewardsList = []
+for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
+    if (reward['Type'] == 'Classical'):
+        theta1 = reward['RewardZoneStart'] / VirtualTrackLength * np.pi * 2
+        theta2 = reward['RewardZoneEnd'] / VirtualTrackLength * np.pi * 2
+        visualization.add_zone(theta1, theta2, fillcolor=None, edgecolor=stimulus['Color'], 
+                               hatch='....', width=1.33, alpha=1.0)
+        RewardsList.append(ClassicalRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
+                reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
+                reward['MaxSequentialRewards'], (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )
+    else:
+        raise(NotImplementedError("Reward types other than classical are not yet implemented"))
+
+
+
+
 from SerialInterfaceSimulator import SerialInterface
 
 Interface = SerialInterface()
@@ -75,13 +109,24 @@ while(True):
     last_ts = time.monotonic()   # to match with miniscope timestamps (which is written in msec, here is sec)
     FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
 
-    if (MasterTime % 3000) == 0:
-        print('Heartbeat {} '.format(MasterTime))
+    UnwrappedPosition = (UnwrappedEncoder - initialUnwrappedencoder) /Config['Maze']['EncoderGain'] * d  * np.pi 
+    TrackPosition = UnwrappedPosition % VirtualTrackLength
 
-    LinearPosition = (UnwrappedEncoder - initialUnwrappedencoder) * d /4096 * np.pi 
-    RingAngle = np.pi * 2 * (UnwrappedEncoder - initialUnwrappedencoder) / Config['Maze']['EncoderGain']
-    
+    if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
+        print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, UnwrappedPosition, GPIO[0]))
+
+    for sound in SoundStimuliList:
+        if(sound.localized):
+            sound.pos_update_gain(TrackPosition)
+
+    for reward in RewardsList:
+        if reward.pos_reward(TrackPosition, MasterTime):
+            print('Reward!')
+
+    # Visualization
+    #RingAngle = np.pi * 2 * (UnwrappedEncoder - initialUnwrappedencoder) / Config['Maze']['EncoderGain']
+    RingAngle = (TrackPosition / VirtualTrackLength) * 2 * np.pi
     if (MasterTime % 100) == 0:
-        track.move_mouse(RingAngle)
+        visualization.move_mouse(RingAngle)
 
             
