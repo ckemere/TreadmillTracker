@@ -42,5 +42,40 @@ class ClassicalRewardZone():
         return None
 
 
+class OperantRewardZone():
+    def __init__(self, activeZone: Tuple[int,int], dispensePin: int, pulseLength:int , refractoryPeriod : int = 1000,
+                        maximumRewards: int = 1, resetZone: Union[None, Tuple[int,int]] = None,
+                        insideLickRate: float = 10.0):
+
+        self.dispensePin = dispensePin
+        self.pulseLength = pulseLength
+        self.activeZone = activeZone
+        self.resetZone = resetZone
+        self.refractoryPeriod = refractoryPeriod
+        self.maximumRewards = maximumRewards
+
+        self.currentNumberOfRewards = 0
+        self.lastRewardTime = 0
+        self.active = True
+
+
+    def pos_reward(self, pos: int, currentTime: int) -> Union[None, Tuple[int,int]]:
+        if inside(self.activeZone, pos):
+            if (currentTime > (self.lastRewardTime + self.refractoryPeriod)):
+                if (self.currentNumberOfRewards < self.maximumRewards):
+                    self.lastRewardTime = currentTime
+                    self.currentNumberOfRewards += 1
+                    if (self.currentNumberOfRewards >= self.maximumRewards):
+                        self.active = False
+
+                    return (self.dispensePin, self.pulseLength)
+
+        elif self.resetZone:
+            if inside(self.resetZone, pos):
+                self.active = True
+
+        return None
+
+
 
     

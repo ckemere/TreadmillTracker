@@ -23,18 +23,37 @@ import numpy as np
 GPIO_IDs = [16, 17, 18, 19, 24, 25, 26, 27, -1]
 
 # Command-line arguments: computer settings
+# Command-line arguments: computer settings
+parser = argparse.ArgumentParser(description='Run simple linear track experiment.')
+parser.add_argument('-P', '--serial-port', default='/dev/ttyS0',
+                   help='TTY device for USB-serial interface (e.g., /dev/ttyUSB0 or COM10)')
+parser.add_argument('--param-file', default='defaults.yaml',  
+                    help='YAML file containing task parameters')
+parser.add_argument('--output-dir', default='./',
+                    help='Directory to write output file (defaults to cwd)')
+args = parser.parse_args()
+if not os.path.isdir(args.output_dir):
+    os.mkdir(args.output_dir)
+if not args.output_dir.endswith('/'):
+    args.output_dir += '/'
+print(args)
+
 
 # YAML parameters: task settings
-with open('defaults.yaml', 'r') as f:
+with open(args.param_file, 'r') as f:
     Config = yaml.safe_load(f)
 
 print('Normalizing stimuli:')
 StimuliList = Config['AuditoryStimuli']['StimuliList']
 for stimulus_name, stimulus in StimuliList.items(): 
     print(' - ',stimulus_name)
-    for key in Config['AuditoryStimuli']['Defaults']:
+    for key, config_item in Config['AuditoryStimuli']['Defaults'].items():
         if key not in stimulus:
-            stimulus[key] = Config['AuditoryStimuli']['Defaults'][key]
+            stimulus[key] = config_item
+        elif isinstance(config_item, dict):
+            for subkey, sub_config_item in config_item.items():
+                if subkey not in stimulus[key]:
+                    stimulus[key][subkey] = sub_config_item
 
 
 #----------------------- parameters --------------

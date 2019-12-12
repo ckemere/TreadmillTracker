@@ -46,9 +46,17 @@ AuditoryStimuli:
       Filename: 'tone_7kHz.wav'
       Color: 'red'
     Zone_3:
-      CenterPosition: 112.5 
+      CenterPosition: 102.5 
       Filename: 'tone_10kHz.wav'
+      Modulation:
+        Width: 15
       Color: 'orange'
+    Zone_4:
+      CenterPosition: 122.5 
+      Filename: 'tone_7kHz.wav'
+      Modulation:
+        Width: 15
+      Color: 'yellow'
 
 RewardZones:
   Defaults:
