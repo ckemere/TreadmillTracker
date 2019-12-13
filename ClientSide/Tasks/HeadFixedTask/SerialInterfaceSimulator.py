@@ -11,6 +11,8 @@ class SerialInterface():
         self.GPIO_state:bytes = b'\x00' # initialize GPIO state to 0
 
         self.EncoderData = []
+        self.GPIOData = []
+
         self.MasterTime = 0 # supposed to be a 4 byte int
 
         # Load a sample data file
@@ -19,10 +21,13 @@ class SerialInterface():
             reader = csv.reader(csvfile, delimiter=',') 
             for row in reader: 
                 self.EncoderData.append(int(row[2])) # Append the (wrapped) Encoder data
+                self.GPIOData.append(int(row[1])) # Append the (wrapped) Encoder data
+
 
         self.UnwrappedEncoder = self.EncoderData[0] # supposed to be an unsigned 4 byte int
         self.Encoder = self.EncoderData[0] # supposed to be a 2 byte int
         self.EncoderGenerator = cycle(self.EncoderData) # make it circular
+        self.GPIOGenerator = cycle(self.GPIOData) # make it circular
         self.Clock = time.monotonic()
 
 
@@ -49,6 +54,10 @@ class SerialInterface():
             DiffEncoder = DiffEncoder + 4096
         self.UnwrappedEncoder += DiffEncoder
         self.Encoder = NextEncoder
+        
+        NextGPIOData = next(self.GPIOGenerator)
+        MaskedGPIO = (NextGPIOData | self.GPIO_state[0]).to_bytes(1, byteorder='little')
+
         #FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO  = struct.unpack('<cBLhlBx', x)
         # c = char, B = unsigned char, L = unsigned long (4 bytes), h = short (2 bytes), l = long, x = pad byte
         assert(FlagChar == b'E')
@@ -57,9 +66,10 @@ class SerialInterface():
         while (currentClock - self.Clock) < 0.002:
             time.sleep((0.002 - (currentClock-self.Clock))*0.8)
             currentClock = time.monotonic()
-        self.Clock = currentClock 
+        self.Clock = currentClock
 
-        return_value = FlagChar, StructSize, self.MasterTime, self.Encoder, self.UnwrappedEncoder, self.GPIO_state
+
+        return_value = FlagChar, StructSize, self.MasterTime, self.Encoder, self.UnwrappedEncoder, MaskedGPIO
 
         data = b'\x00'
         active_callbacks = [c for c in self.GPIO_pin_reset_callbacks if self.MasterTime >= c[0]]

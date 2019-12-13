@@ -96,18 +96,26 @@ for stimulus_name, stimulus in StimuliList.items():
     time.sleep(1.0)
 
 
-from RewardZone import ClassicalRewardZone
+from RewardZone import ClassicalRewardZone, OperantRewardZone
 
 RewardsList = []
 for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
-    if (reward['Type'] == 'Classical'):
+    if (reward['Type'] == 'Classical') | (reward['Type'] == 'Operant'):
         theta1 = reward['RewardZoneStart'] / VirtualTrackLength * np.pi * 2
         theta2 = reward['RewardZoneEnd'] / VirtualTrackLength * np.pi * 2
         visualization.add_zone(theta1, theta2, fillcolor=None, edgecolor=stimulus['Color'], 
                                hatch='....', width=1.33, alpha=1.0)
-        RewardsList.append(ClassicalRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
-                reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
-                reward['MaxSequentialRewards'], (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )
+
+        if (reward['Type'] == 'Classical'):
+            RewardsList.append(ClassicalRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
+                    reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
+                    reward['MaxSequentialRewards'], (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )
+
+        elif (reward['Type'] == 'Operant'):
+            RewardsList.append(OperantRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
+                    reward['LickPin'], reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
+                    reward['MaxSequentialRewards'], 
+                    (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )            
     else:
         raise(NotImplementedError("Reward types other than classical are not yet implemented"))
 
@@ -132,14 +140,14 @@ while(True):
     TrackPosition = UnwrappedPosition % VirtualTrackLength
 
     if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
-        print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, UnwrappedPosition, GPIO[0]))
+        print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, TrackPosition, GPIO[0]))
 
     for sound in SoundStimuliList:
         if(sound.localized):
             sound.pos_update_gain(TrackPosition)
 
     for reward in RewardsList:
-        if reward.pos_reward(TrackPosition, MasterTime):
+        if reward.pos_reward(TrackPosition, GPIO[0], MasterTime):
             print('Reward!')
 
     # Visualization
