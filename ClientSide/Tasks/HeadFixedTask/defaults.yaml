@@ -5,19 +5,16 @@ Info:
   Session: ''
   TaskType: 3tones-change-classical
 
-
 Preferences:
   HeartBeat: 250 # ms
   AudioFileDirectory: '/mnt/d/Development/Design/TreadmillTracker/ClientSide/Tasks/HeadFixedTask/Sounds'
 
-GPIO:
-  Dispense: 27
-  Lick: 16
-
 Maze:
+  Type: 'VR' # VR or physical
   EncoderGain: 4096.0 # encoder value per revolution
   Length: 150.0 # cm
   WheelDiameter: 20.2 # cm
+  TrackTransform: None
 
 AuditoryStimuli:
   Defaults:
@@ -56,8 +53,8 @@ RewardZones:
   RewardZoneList:
     Reward1:
       Type: 'Operant'
-      LickPin: 1
-      DispensePin: 7
+      LickPin: 1 # ( Pin 16 )
+      DispensePin: 7  # ( Pin 27 )
       PumpRunTime: 100 # How long to run the reward pump for
       LickTimeout: 3000.0 # Time between reward availability
       MaxSequentialRewards: 5
@@ -65,6 +62,6 @@ RewardZones:
       RewardZoneEnd: 130
       ResetZoneStart: 20
       ResetZoneEnd: 70
-      Color: 'green'
+      Color: 'black'
 
 

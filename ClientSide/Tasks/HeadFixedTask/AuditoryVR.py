@@ -11,10 +11,11 @@
 #     max_reward_times controls the max number of reward it can get within one single lap
 
 import time
+import datetime
 import os
 import argparse
 import yaml
-import datetime
+import csv
 import numpy as np
 
 ### Maybe should add argcomplete for this program?
@@ -38,6 +39,10 @@ if not args.output_dir.endswith('/'):
     args.output_dir += '/'
 print(args)
 
+now = datetime.datetime.now()
+log_filename = '{}{}.txt'.format('Log', now.strftime("%Y-%m-%d %H%M"))
+log_filename = os.path.join(args.output_dir, log_filename)
+
 
 # YAML parameters: task settings
 with open(args.param_file, 'r') as f:
@@ -57,15 +62,18 @@ for stimulus_name, stimulus in StimuliList.items():
 
 
 #----------------------- parameters --------------
-VirtualTrackLength = Config['Maze']['Length'] #cm
-d = Config['Maze']['WheelDiameter'] #cm diameter of the physical wheel; 150cm
+TrackTransform = None
+
+if Config['Maze']['Type'] == 'VR':
+    VirtualTrackLength = Config['Maze']['Length'] #cm
+    d = Config['Maze']['WheelDiameter'] #cm diameter of the physical wheel; 150cm
 count = 0
 
 
 #%%
 from RenderTrack import RenderTrack
 
-visualization = RenderTrack(d/2)
+visualization = RenderTrack(track_length=VirtualTrackLength)
 
 from SoundStimulus import SoundStimulus
 
@@ -80,13 +88,14 @@ for stimulus_name, stimulus in StimuliList.items():
     SoundStimuliList.append(SoundStimulus(filename=filename))
 
     if stimulus['Type'] == 'Background':
-        visualization.add_zone(0, np.pi*2, fillcolor=stimulus['Color'], width=0.5, alpha=0.75)
+        visualization.add_zone_position(0, VirtualTrackLength, fillcolor=stimulus['Color'], width=0.5, alpha=0.75)
+
         SoundStimuliList[-1].change_gain(stimulus['BaselineGain'])
 
     else:
-        theta1 = (stimulus['CenterPosition'] - stimulus['Modulation']['Width']/2) / VirtualTrackLength * np.pi * 2
-        theta2 = (stimulus['CenterPosition'] + stimulus['Modulation']['Width']/2) / VirtualTrackLength * np.pi * 2
-        visualization.add_zone(theta1, theta2, fillcolor=stimulus['Color'])
+        visualization.add_zone_position(stimulus['CenterPosition'] - stimulus['Modulation']['Width']/2, 
+                               stimulus['CenterPosition'] + stimulus['Modulation']['Width']/2, 
+                               fillcolor=stimulus['Color'])
 
         SoundStimuliList[-1].initLocalizedSound(center=stimulus['CenterPosition'], 
                         width=stimulus['Modulation']['Width'], trackLength=VirtualTrackLength, 
@@ -101,10 +110,8 @@ from RewardZone import ClassicalRewardZone, OperantRewardZone
 RewardsList = []
 for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
     if (reward['Type'] == 'Classical') | (reward['Type'] == 'Operant'):
-        theta1 = reward['RewardZoneStart'] / VirtualTrackLength * np.pi * 2
-        theta2 = reward['RewardZoneEnd'] / VirtualTrackLength * np.pi * 2
-        visualization.add_zone(theta1, theta2, fillcolor=None, edgecolor=stimulus['Color'], 
-                               hatch='....', width=1.33, alpha=1.0)
+        visualization.add_zone_position(reward['RewardZoneStart'], reward['RewardZoneEnd'], 
+                        fillcolor=None, edgecolor=stimulus['Color'], hatch='....', width=1.33, alpha=1.0)
 
         if (reward['Type'] == 'Classical'):
             RewardsList.append(ClassicalRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
@@ -121,7 +128,6 @@ for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
 
 
 
-
 from SerialInterfaceSimulator import SerialInterface
 
 Interface = SerialInterface()
@@ -130,30 +136,41 @@ FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.re
 initialUnwrappedencoder = UnwrappedEncoder 
 print("initial unwrapped encoder value : ", UnwrappedEncoder)
 
-## every 2 ms happens:
-while(True):
-    # last_ts = time.time()
-    last_ts = time.monotonic()   # to match with miniscope timestamps (which is written in msec, here is sec)
-    FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+with open(log_filename, 'w', newline='') as log_file:
+    writer = csv.writer(log_file)
 
-    UnwrappedPosition = (UnwrappedEncoder - initialUnwrappedencoder) /Config['Maze']['EncoderGain'] * d  * np.pi 
-    TrackPosition = UnwrappedPosition % VirtualTrackLength
+    while(True):
+        ## every 2 ms happens:
+        last_ts = time.monotonic()   # to match with miniscope timestamps (which is written in msec, here is sec)
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
 
-    if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
-        print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, TrackPosition, GPIO[0]))
+        writer.writerow([MasterTime, GPIO, Encoder, UnwrappedEncoder, last_ts])
 
-    for sound in SoundStimuliList:
-        if(sound.localized):
-            sound.pos_update_gain(TrackPosition)
+        if Config['Maze']['Type'] == 'VR':
+            UnwrappedPosition = (UnwrappedEncoder - initialUnwrappedencoder) / Config['Maze']['EncoderGain'] *d *np.pi 
+            TrackPosition = UnwrappedPosition % VirtualTrackLength
+        else:
+            # GPIO to Position transformation
+            # Use this for controlling behavior on a physical track where position is not tracked by a rotary encoder
+            # TrackPosition = TrackTransform.convert(GPIO[0])
+            TrackPosition = 0 
 
-    for reward in RewardsList:
-        if reward.pos_reward(TrackPosition, GPIO[0], MasterTime):
-            print('Reward!')
+        if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
+            print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, TrackPosition, GPIO[0]))
 
-    # Visualization
-    #RingAngle = np.pi * 2 * (UnwrappedEncoder - initialUnwrappedencoder) / Config['Maze']['EncoderGain']
-    RingAngle = (TrackPosition / VirtualTrackLength) * 2 * np.pi
-    if (MasterTime % 100) == 0:
-        visualization.move_mouse(RingAngle)
+
+        # Stimulus
+        for sound in SoundStimuliList:
+            if(sound.localized):
+                sound.pos_update_gain(TrackPosition)
+
+        # Reward
+        for reward in RewardsList:
+            if reward.pos_reward(TrackPosition, GPIO[0], MasterTime):
+                print('Reward!')
+
+        # Visualization
+        if (MasterTime % 100) == 0:
+            visualization.move_mouse_position(TrackPosition)
 
             
