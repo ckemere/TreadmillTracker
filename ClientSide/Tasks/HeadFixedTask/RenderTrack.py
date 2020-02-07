@@ -6,9 +6,8 @@ from matplotlib.patches import Circle, Wedge
 import math
 
 class RenderTrack:
-    def __init__(self, radius=10, thickness=0.2):
+    def __init__(self, radius=10, thickness=0.2, track_length=None):
         self.radius = radius
-        print('Hello: ', self.radius)
         self.zones = []
 
         plt.ion() # "interactive on"
@@ -32,10 +31,31 @@ class RenderTrack:
 
         self.ax.invert_xaxis() # make the rendered angles go clockwise...
 
+        self.track_length = track_length
+        
+        plt.pause(0.1)
+
+    def add_zone_position(self, start, stop, fillcolor='wheat', edgecolor=None, width=1.0, alpha=0.5, hatch=None):
+        if not self.track_length:
+            raise(EnvironmentError("Track length not specified in object initialization."))
+
+        w = self.radius*0.2*width
+        r = self.radius + w/2
+        th1 = (start / self.track_length) * 360
+        th2 = (stop / self.track_length) * 360
+        print('New zone: {} {} ({})'.format(start, stop, fillcolor))
+        fill = True if fillcolor else False
+        zone = Wedge([0,0], r, th1, th2, width=w, zorder=0.9, 
+                      facecolor=fillcolor, edgecolor=edgecolor,
+                      fill=fill, alpha=alpha, hatch=hatch)
+        self.ax.add_artist(zone)
+        self.zones.append(zone)
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
         plt.pause(0.1)
 
 
-    def add_zone(self, theta1, theta2, fillcolor='wheat', edgecolor=None, width=1.0, alpha=0.5, hatch=None):
+    def add_zone_angles(self, theta1, theta2, fillcolor='wheat', edgecolor=None, width=1.0, alpha=0.5, hatch=None):
         w = self.radius*0.2*width
         r = self.radius + w/2
         th1 = theta1 / np.pi * 180
@@ -51,9 +71,20 @@ class RenderTrack:
         self.fig.canvas.flush_events()
         plt.pause(0.1)
 
-    def move_mouse(self, theta):
+    def move_mouse_position(self, pos):
+        if not self.track_length:
+            raise(EnvironmentError("Track length not specified in object initialization."))
+        theta = np.pi * 2 * (pos/self.track_length)
         self.mouse.center = ( self.radius * math.cos(theta),
                             self.radius * math.sin(theta) )
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
+
+
+    def move_mouse_angle(self, theta):
+        self.mouse.center = ( self.radius * math.cos(theta),
+                            self.radius * math.sin(theta) )
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
 
