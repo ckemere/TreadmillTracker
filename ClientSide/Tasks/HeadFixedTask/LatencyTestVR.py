@@ -9,6 +9,9 @@
 #     pump logic controlled by PumpOn and PumpOffTime, so each time the pump is triggered, it must reset after 100ms regardless of animal's pos
 #     peak_volume is constant number regardless of different tone frequencies
 #     max_reward_times controls the max number of reward it can get within one single lap
+#
+#  See SoundStimulus.py - need to run `jackd -R -P50 -v -d alsa -p64 -n2 -P hw:1,0 -r48000` (use aplay -l/-L to figure out which hw device)
+#
 
 import time
 import datetime
