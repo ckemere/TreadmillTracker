@@ -38,7 +38,7 @@ class SerialInterface():
         # Find offset in this set
         index = 0
         while(True):
-            print(x[index:])
+            # print(x[index:])
             continueFlag = False
             for k in range(K):
                 if ( x.index(self.startChar,index + k*self.MessageLen) - (k*self.MessageLen + index)) != 0:
@@ -52,7 +52,7 @@ class SerialInterface():
                 assert(False)
                 break
 
-        print('Found index: {}'.format(index))
+        # print('Found index: {}'.format(index))
 
         x = self.serial.read(index) # read the last little bit of the bad block, and we are in sync!
 
@@ -116,7 +116,7 @@ class SerialInterface():
 
         writeString += pin.to_bytes(1, byteorder='big',signed=True)
         writeString += value.to_bytes(1, byteorder='big',signed=True)
-        print(value, writeString)
+        # print(value, writeString) # debuggging
         self.serial.write(writeString)
 
 

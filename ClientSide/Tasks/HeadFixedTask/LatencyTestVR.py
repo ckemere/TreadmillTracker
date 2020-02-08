@@ -118,6 +118,11 @@ if 'GPIO' in Config:
     for gpio_label, gpio_config in Config['GPIO'].items():
         Interface.add_gpio(gpio_label, gpio_config)
 
+
+# Create a GPIO pin to use to trigger the lick sensor
+Interface.add_gpio('LickTrigger',{'Number':1,'Type':'Output', 'Mirror':True})
+
+
 from RewardZone import ClassicalRewardZone, OperantRewardZone
 
 RewardsList = []
@@ -152,6 +157,8 @@ for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
                     (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )            
     else:
         raise(NotImplementedError("Reward types other than classical are not yet implemented"))
+
+
 
 
 Interface.connect()
@@ -194,6 +201,13 @@ with open(log_filename, 'w', newline='') as log_file:
             # Stimulus
             for _, sound in SoundStimuliList.items():
                 sound.pos_update_gain(TrackPosition)
+
+        if (MasterTime % 1000) == 0:
+            Interface.raise_output('LickTrigger')
+
+        if (MasterTime % 1000) == 50:
+            Interface.lower_output('LickTrigger')
+
 
         # Reward
         if RewardPumpActive:
