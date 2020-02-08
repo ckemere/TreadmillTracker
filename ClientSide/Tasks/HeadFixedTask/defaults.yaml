@@ -7,7 +7,17 @@ Info:
 
 Preferences:
   HeartBeat: 250 # ms
-  AudioFileDirectory: '/mnt/d/Development/Design/TreadmillTracker/ClientSide/Tasks/HeadFixedTask/Sounds'
+  AudioFileDirectory: '/home/ckemere/Code/TreadmillTracker/ClientSide/Tasks/HeadFixedTask/Sounds'
+
+GPIO:
+  Lick:
+    Number: 3
+    Type: 'Input_Pulldown'
+    Power: True
+  Reward:
+    Number: 4
+    Type: 'Output'
+    Mirror: True
 
 Maze:
   Type: 'VR' # VR or physical
@@ -29,39 +39,24 @@ AuditoryStimuli:
       CutoffGain: -60.0 #dB at cutoff
 
   StimuliList:
-    BackgroundSound:
-      Type: 'Background'
-      BaselineGain: -5.0
-      Filename: 'pink_noise.wav'
-      Color: 'pink'
-    Zone_1:
-      CenterPosition: 12.5 
-      Filename: 'tone_3kHz.wav'
-      Color: 'lime'
-    Zone_2:
-      CenterPosition: 62.5 
-      Filename: 'tone_7kHz.wav'
-      Color: 'red'
-    Zone_3:
-      CenterPosition: 102.5 
-      Filename: 'tone_10kHz.wav'
-      Modulation:
-        Width: 25
-      Color: 'orange'
+    RewardSound:
+      Type: 'Beep'
+      Filename: 'tone_11kHz.wav'
 
 RewardZones:
   RewardZoneList:
     Reward1:
       Type: 'Operant'
-      LickPin: 1 # ( Pin 16 )
-      DispensePin: 7  # ( Pin 27 )
-      PumpRunTime: 100 # How long to run the reward pump for
+      LickPin: 'Lick'
+      DispensePin: 'Reward'
+      PumpRunTime: 250 # How long to run the reward pump for
       LickTimeout: 3000.0 # Time between reward availability
-      MaxSequentialRewards: 5
-      RewardZoneStart: 110
-      RewardZoneEnd: 130
-      ResetZoneStart: 20
-      ResetZoneEnd: 70
+      MaxSequentialRewards: 500
+      RewardZoneStart: 145
+      RewardZoneEnd: 30
+      ResetZoneStart: 100
+      ResetZoneEnd: 130
       Color: 'black'
+      RewardSound: 'RewardSound'
 
 

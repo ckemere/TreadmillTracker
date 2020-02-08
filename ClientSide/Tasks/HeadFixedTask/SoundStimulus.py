@@ -41,22 +41,23 @@ class SoundStimulus():
         if not os.path.isfile(filename):
             raise(ValueError("Sound file {} could not be found.".format(filename)))
 
-        # Handle the minimixer already running
-        if not self.jack_client.get_ports('minimixer:', is_input=True): # minimix not started
-            minimix_cmd  = ['/usr/local/bin/jackminimix', '-a', '-c', str(totalStimuli), '-p', str(osc_port)]
-            self.p_minimix = Popen(minimix_cmd)
+        if False:
+            # Handle the minimixer already running
+            if not self.jack_client.get_ports('minimixer:', is_input=True): # minimix not started
+                minimix_cmd  = ['/usr/local/bin/jackminimix', '-a', '-c', str(totalStimuli), '-p', str(osc_port)]
+                self.p_minimix = Popen(minimix_cmd)
 
-            for i in range(5):
+                for i in range(5):
+                    if self.jack_client.get_ports('minimixer:', is_input=True):
+                        break
+                    time.sleep(1.0)
+
                 if self.jack_client.get_ports('minimixer:', is_input=True):
-                    break
-                time.sleep(1.0)
-
-            if self.jack_client.get_ports('minimixer:', is_input=True):
-                print('JACK Minimixer started')
+                    print('JACK Minimixer started')
+                else:
+                    raise(EnvironmentError("Could not start minimixer"))
             else:
-                raise(EnvironmentError("Could not start minimixer"))
-        else:
-            print('Connecting to existing minimixer instance.')
+                print('Connecting to existing minimixer instance.')
 
 
         if filename is not None:
@@ -85,10 +86,11 @@ class SoundStimulus():
                 else:
                     print('Input port: {}'.format(self.inputPort))
 
-            jackplay_cmd = ['/usr/local/bin/sndfile-jackplay', '-l0', '-a=minimixer:in{}_{}'.format(self.inputPort,                             channel), '{}'.format(filename)]
+            jackplay_cmd = ['/usr/local/bin/sndfile-jackplay', '-l0', '-a=minimixer:in{}_{}'.format(self.inputPort,channel), '{}'.format(filename)]
+            print(jackplay_cmd)
+        
 
-
-        self.p_jackplay = Popen(jackplay_cmd, stdout=DEVNULL, stderr=DEVNULL)
+        #self.p_jackplay = Popen(jackplay_cmd, stdout=DEVNULL, stderr=DEVNULL)
         time.sleep(0.25)
 
         self.oscC = OSCClient('127.0.0.1', int(osc_port))

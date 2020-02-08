@@ -77,7 +77,9 @@ visualization = RenderTrack(track_length=VirtualTrackLength)
 
 from SoundStimulus import SoundStimulus
 
-SoundStimuliList = []
+BackgroundSounds = {}
+Beeps = {}
+SoundStimuliList = {}
 
 for stimulus_name, stimulus in StimuliList.items():
 
@@ -85,24 +87,39 @@ for stimulus_name, stimulus in StimuliList.items():
     if Config['Preferences']['AudioFileDirectory']:
         filename = os.path.join(Config['Preferences']['AudioFileDirectory'], filename)
     print('Loading: {}'.format(filename))
-    SoundStimuliList.append(SoundStimulus(filename=filename))
 
     if stimulus['Type'] == 'Background':
+        BackgroundSounds[stimulus_name] = SoundStimulus(filename=filename)
         visualization.add_zone_position(0, VirtualTrackLength, fillcolor=stimulus['Color'], width=0.5, alpha=0.75)
-
-        SoundStimuliList[-1].change_gain(stimulus['BaselineGain'])
-
-    else:
+        BackgroundSounds[stimulus_name].change_gain(stimulus['BaselineGain'])
+    elif stimulus['Type'] == 'Beep':
+        Beeps[stimulus_name] = SoundStimulus(filename=filename)
+        Beeps[stimulus_name].change_gain(stimulus['BaselineGain'])
+        Beeps[stimulus_name].change_gain(-90.0) # beep for a very short moment
+    elif stimulus['Type'] == 'Localized':
+        SoundStimuliList[stimulus_name] = SoundStimulus(filename=filename)
         visualization.add_zone_position(stimulus['CenterPosition'] - stimulus['Modulation']['Width']/2, 
                                stimulus['CenterPosition'] + stimulus['Modulation']['Width']/2, 
                                fillcolor=stimulus['Color'])
 
-        SoundStimuliList[-1].initLocalizedSound(center=stimulus['CenterPosition'], 
+        SoundStimuliList[stimulus_name].initLocalizedSound(center=stimulus['CenterPosition'], 
                         width=stimulus['Modulation']['Width'], trackLength=VirtualTrackLength, 
                         maxGain=stimulus['BaselineGain'], minGain=stimulus['Modulation']['CutoffGain'])
-        SoundStimuliList[-1].change_gain(-90.0) # start off turned off
+        SoundStimuliList[stimulus_name].change_gain(-90.0) # start off turned off
 
     time.sleep(1.0)
+
+
+from SerialInterface import SerialInterface
+
+Interface = SerialInterface(SerialPort=args.serial_port)
+
+if 'GPIO' in Config:
+    for gpio_label, gpio_config in Config['GPIO'].items():
+        Interface.add_gpio(gpio_label, gpio_config)
+
+Interface.add_gpio('Stim',{'Number':1,'Type':'Output', 'Mirror':True})
+
 
 
 from RewardZone import ClassicalRewardZone, OperantRewardZone
@@ -110,17 +127,31 @@ from RewardZone import ClassicalRewardZone, OperantRewardZone
 RewardsList = []
 for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
     if (reward['Type'] == 'Classical') | (reward['Type'] == 'Operant'):
+        if reward['DispensePin'] not in Interface.GPIOs:
+            raise ValueError('Dispense pin not in defined GPIO list')
+
+        if reward['RewardSound'] != 'None':
+            if reward['RewardSound'] not in Beeps:
+                raise ValueError('Reward sound not in defined Beeps list')
+
+
         visualization.add_zone_position(reward['RewardZoneStart'], reward['RewardZoneEnd'], 
-                        fillcolor=None, edgecolor=stimulus['Color'], hatch='....', width=1.33, alpha=1.0)
+                        fillcolor=None, edgecolor=reward['Color'], hatch='....', width=1.33, alpha=1.0)
 
         if (reward['Type'] == 'Classical'):
             RewardsList.append(ClassicalRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
-                    reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
+                    reward['DispensePin'], reward['PumpRunTime'], reward['RewardSound'],
+                    reward['LickTimeout'],
                     reward['MaxSequentialRewards'], (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )
 
         elif (reward['Type'] == 'Operant'):
+            if reward['LickPin'] not in Interface.GPIOs:
+                raise ValueError('Lick pin not in defined GPIO list')
+            lickPinNumber = Interface.GPIOs[reward['LickPin']]['Number'] # We are going to bit mask raw GPIO for this
+
             RewardsList.append(OperantRewardZone((reward['RewardZoneStart'], reward['RewardZoneEnd']),
-                    reward['LickPin'], reward['DispensePin'], reward['PumpRunTime'], reward['LickTimeout'],
+                    lickPinNumber, reward['DispensePin'], reward['PumpRunTime'], reward['RewardSound'],
+                    reward['LickTimeout'],
                     reward['MaxSequentialRewards'], 
                     (reward['ResetZoneStart'], reward['ResetZoneEnd'])) )            
     else:
@@ -128,13 +159,18 @@ for reward_name, reward in Config['RewardZones']['RewardZoneList'].items():
 
 
 
-from SerialInterfaceSimulator import SerialInterface
 
-Interface = SerialInterface()
+Interface.connect()
+
 ## initiate encoder value ##
-FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+#FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO, AuxGPIO = Interface.read_data()
+
 initialUnwrappedencoder = UnwrappedEncoder 
 print("initial unwrapped encoder value : ", UnwrappedEncoder)
+
+RewardPumpEndTime = 0
+RewardPumpActive = False
 
 with open(log_filename, 'w', newline='') as log_file:
     writer = csv.writer(log_file)
@@ -142,9 +178,12 @@ with open(log_filename, 'w', newline='') as log_file:
     while(True):
         ## every 2 ms happens:
         last_ts = time.monotonic()   # to match with miniscope timestamps (which is written in msec, here is sec)
-        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+        #FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO = Interface.read_data()
+        FlagChar, StructSize, MasterTime, Encoder, UnwrappedEncoder, GPIO, AuxGPIO = Interface.read_data()
 
-        writer.writerow([MasterTime, GPIO, Encoder, UnwrappedEncoder, last_ts])
+
+        if False:
+            writer.writerow([MasterTime, GPIO, Encoder, UnwrappedEncoder, last_ts])
 
         if Config['Maze']['Type'] == 'VR':
             UnwrappedPosition = (UnwrappedEncoder - initialUnwrappedencoder) / Config['Maze']['EncoderGain'] *d *np.pi 
@@ -155,22 +194,45 @@ with open(log_filename, 'w', newline='') as log_file:
             # TrackPosition = TrackTransform.convert(GPIO[0])
             TrackPosition = 0 
 
-        if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
-            print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, TrackPosition, GPIO[0]))
+        if False:
+            if (MasterTime % Config['Preferences']['HeartBeat']) == 0:
+                print('Heartbeat {} - {} - 0x{:08b}'.format(MasterTime, TrackPosition, GPIO))
 
 
-        # Stimulus
-        for sound in SoundStimuliList:
-            if(sound.localized):
+            # Stimulus
+            for _, sound in SoundStimuliList.items():
                 sound.pos_update_gain(TrackPosition)
 
-        # Reward
-        for reward in RewardsList:
-            if reward.pos_reward(TrackPosition, GPIO[0], MasterTime):
-                print('Reward!')
+        if (MasterTime % 1000) == 0:
+            Interface.raise_output('Stim')
 
-        # Visualization
-        if (MasterTime % 100) == 0:
-            visualization.move_mouse_position(TrackPosition)
+        if (MasterTime % 1000) == 50:
+            Interface.lower_output('Stim')
+
+
+        # Reward
+        if RewardPumpActive:
+            if MasterTime > RewardPumpEndTime:
+                RewardPumpActive = False
+                Interface.lower_output(RewardPin)
+                if RewardSound:
+                    Beeps[RewardSound].change_gain(-90.0)
+
+        if not RewardPumpActive: # Only check for reward if we're not rewarding
+            for reward in RewardsList:
+                reward_values = reward.pos_reward(TrackPosition, GPIO, MasterTime)
+                if (reward_values):
+                    RewardPin, PulseLength, RewardSound = reward_values
+                    RewardPumpActive = True
+                    RewardPumpEndTime = MasterTime + PulseLength
+                    Interface.raise_output(RewardPin)
+                    if RewardSound:
+                        Beeps[RewardSound].change_gain(stimulus['BaselineGain'])
+                    print('Reward!')
+
+        if False:
+            # Visualization
+            if (MasterTime % 100) == 0:
+                visualization.move_mouse_position(TrackPosition)
 
             
